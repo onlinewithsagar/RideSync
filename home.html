@@ -487,7 +487,15 @@
 
         // Firebase Setup
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'demo-ridesync-1';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const firebaseConfig = {
+    apiKey: "AIzaSyCJrFdsgUkETRdbj1yi8G4wvEDl-8lhYSY",
+    authDomain: "ridesync-in.firebaseapp.com",
+    projectId: "ridesync-in",
+    storageBucket: "ridesync-in.firebasestorage.app",
+    messagingSenderId: "331537348450",
+    appId: "1:331537348450:web:a96a198d20db852a36de3b",
+    measurementId: "G-XP4W8Z8RMN"
+  };
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
