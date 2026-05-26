@@ -3,21 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>RideSync - Live Telemetry & Navigation</title>
+    <title>RideSync - Elite Terminal</title>
     
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    
-    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Orbitron:wght@400;500;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-    
-    <!-- Leaflet CSS for OpenStreetMap -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     
     <script>
         tailwind.config = {
@@ -40,8 +32,9 @@
                     },
                     boxShadow: {
                         'neon': '0 0 15px rgba(255, 61, 0, 0.4)',
-                        'neon-red': '0 0 25px rgba(211, 47, 47, 0.8)',
-                        'capsule': '0 10px 30px rgba(0,0,0,0.8), inset 0 1px 1px rgba(255,255,255,0.1)'
+                        'neon-intense': '0 0 40px rgba(255, 61, 0, 0.6), inset 0 0 20px rgba(255, 61, 0, 0.2)',
+                        'machined': 'inset 0 1px 1px rgba(255,255,255,0.1), 0 10px 20px rgba(0,0,0,0.8), 0 2px 5px rgba(0,0,0,0.5)',
+                        'machined-pressed': 'inset 0 4px 8px rgba(0,0,0,0.8), 0 1px 2px rgba(255,255,255,0.05)'
                     }
                 }
             }
@@ -59,21 +52,17 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            height: 100vh;
-            margin: 0;
         }
 
-        /* Desktop Presentation Frame */
+        /* Desktop Presentation Frame (Scales perfectly) */
         .device-frame {
             position: relative;
             width: 100%;
             height: 100dvh;
             max-width: 440px;
             max-height: 950px;
-            background: #050505;
+            background: #000;
             overflow: hidden;
-            display: flex;
-            flex-direction: column;
             box-shadow: 0 0 50px rgba(255, 61, 0, 0.05), 0 0 100px rgba(0, 0, 0, 1);
         }
         @media (min-width: 480px) {
@@ -92,918 +81,715 @@
                 background: #000;
                 border-bottom-left-radius: 15px;
                 border-bottom-right-radius: 15px;
-                z-index: 9999;
+                z-index: 999; /* Mock Notch */
             }
         }
 
-        /* Background Textures */
+        /* Garage Shutter & Physics */
+        .shutter-image-container {
+            position: absolute;
+            inset: 0;
+            z-index: 100;
+            background-color: #050505;
+            background-image: url('RideSync.Shutter.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            will-change: transform;
+            border-bottom: 4px solid #2A2B2E;
+            box-shadow: inset 0 -20px 40px rgba(0,0,0,0.8);
+        }
+
+        .vignette-overlay {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 50% 45%, transparent 10%, rgba(0,0,0,0.6) 60%, rgba(0,0,0,1) 100%);
+            z-index: 101;
+            pointer-events: none;
+            animation: vignettePulse 1.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+
+        @keyframes vignettePulse {
+            0% { opacity: 0; }
+            20% { opacity: 1; filter: contrast(1.1) brightness(0.7); }
+            80% { opacity: 1; filter: contrast(1.3) brightness(1.2); }
+            100% { opacity: 1; filter: contrast(1.2) brightness(1); }
+        }
+
+        .floor-glow {
+            position: absolute;
+            bottom: -80px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 200%;
+            height: 80px;
+            background: radial-gradient(ellipse at top, rgba(255, 61, 0, 0.9) 0%, rgba(255, 61, 0, 0.2) 40%, transparent 70%);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+            z-index: 99;
+            filter: blur(5px);
+        }
+
+        .shutter-open {
+            transition: transform 1.2s cubic-bezier(0.7, 0, 0.1, 1);
+            transform: translateY(-105%);
+        }
+
+        /* App Interior */
+        .dashboard-bg {
+            background-color: #050505;
+            position: relative;
+        }
+
+        /* Carbon Tread Background */
         .tread-pattern {
             position: absolute;
             inset: 0;
-            opacity: 0.15;
+            opacity: 0.2;
             background: repeating-linear-gradient(45deg, #020202, #020202 10px, #0a0a0a 10px, #0a0a0a 20px);
             z-index: 0;
-            pointer-events: none;
+            mask-image: radial-gradient(circle at 50% 100%, black 30%, transparent 90%);
+            -webkit-mask-image: radial-gradient(circle at 50% 100%, black 30%, transparent 90%);
         }
 
-        /* View Management */
-        .view-panel {
+        /* HUD Corners */
+        .hud-corner {
+            position: absolute;
+            width: 20px; height: 20px;
+            border: 2px solid rgba(255, 61, 0, 0.3);
+            z-index: 5;
+        }
+        .hud-tl { top: 60px; left: 20px; border-right: none; border-bottom: none; }
+        .hud-tr { top: 60px; right: 20px; border-left: none; border-bottom: none; }
+        .hud-bl { bottom: 20px; left: 20px; border-right: none; border-top: none; }
+        .hud-br { bottom: 20px; right: 20px; border-left: none; border-top: none; }
+
+        /* Staggered Animations */
+        .stagger-item {
+            opacity: 0;
+            transform: translateY(40px) scale(0.98);
+            transition: all 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .dashboard-revealed .stagger-item {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+
+        /* Dynamic Slider Items - NOW SCROLLING RIGHT TO LEFT */
+        .slide-item {
             position: absolute;
             inset: 0;
             opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
-            transform: scale(0.98);
-            z-index: 10;
+            transform: translateX(100%) scale(0.95);
+            transition: all 0.7s cubic-bezier(0.7, 0, 0.2, 1);
             display: flex;
             flex-direction: column;
-            padding-top: 70px; /* Space for top header */
-            padding-bottom: 100px; /* Space for nav bar */
+            align-items: center;
+            justify-content: center;
+            gap: 1.5rem;
+            padding: 0 1.5rem;
+            text-align: center;
         }
-        .view-panel.active {
+        .slide-item.active {
             opacity: 1;
-            pointer-events: auto;
-            transform: scale(1);
-            z-index: 20;
+            transform: translateX(0) scale(1);
+            z-index: 10;
+        }
+        .slide-item.exit {
+            opacity: 0;
+            transform: translateX(-100%) scale(0.95);
+            z-index: 1;
         }
 
-        /* Map specific overrides */
-        #view-map { padding: 0; padding-bottom: 0; }
-        .leaflet-container { background: #050505 !important; font-family: 'Space Mono', monospace; }
-        .leaflet-control-zoom { border: 1px solid rgba(255,255,255,0.1) !important; background: rgba(20,20,20,0.8) !important; backdrop-filter: blur(5px); border-radius: 8px !important; overflow: hidden; margin-top: 80px !important;}
-        .leaflet-control-zoom a { background: transparent !important; color: #FF3D00 !important; border-bottom: 1px solid rgba(255,255,255,0.1) !important; }
-        .leaflet-control-zoom a:hover { background: rgba(255,61,0,0.2) !important; }
-        .leaflet-control-attribution { display: none; } 
-
-        /* Custom Map Marker Ping */
-        .ping-ring {
-            position: absolute;
-            width: 40px; height: 40px;
-            background: rgba(255, 61, 0, 0.4);
-            border-radius: 50%;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            animation: ping-anim 2s cubic-bezier(0, 0, 0.2, 1) infinite;
-            z-index: -1;
+        /* Capsule Buttons */
+        .capsule-btn {
+            width: 100%;
+            border-radius: 9999px;
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 700;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            backdrop-filter: blur(5px);
         }
-        @keyframes ping-anim {
-            75%, 100% { transform: translate(-50%, -50%) scale(2.5); opacity: 0; }
+        .capsule-google {
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
-
-        /* Glass Nav Capsule */
-        .glass-capsule {
-            background: rgba(15, 15, 15, 0.75);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.1);
+        .capsule-google:active { transform: scale(0.96); background: rgba(255,255,255,0.1); }
+        
+        .capsule-phone {
+            border: 1px solid rgba(255, 61, 0, 0.6);
+            background: rgba(255, 61, 0, 0.1);
+            color: #FF3D00;
+            box-shadow: 0 4px 15px rgba(255,61,0,0.15), inset 0 0 10px rgba(255,61,0,0.05);
         }
+        .capsule-phone:active { transform: scale(0.96); background: rgba(255,61,0,0.2); }
 
-        .nav-item {
-            color: #777;
-            transition: all 0.3s ease;
+        /* Inputs & Key Fob */
+        .neon-input-container {
             position: relative;
         }
-        .nav-item.active { color: #FF3D00; }
-        .nav-item.active::after {
-            content: ''; position: absolute;
-            bottom: -6px; left: 50%; transform: translateX(-50%);
-            width: 4px; height: 4px; border-radius: 50%;
-            background: #FF3D00; box-shadow: 0 0 8px #FF3D00;
-        }
-        .nav-item:active { transform: scale(0.9); }
-
-        /* SOS Button */
-        .sos-btn {
-            background: linear-gradient(145deg, #b91c1c, #7f1d1d);
-            border: 2px solid #ef4444;
-            box-shadow: 0 0 15px rgba(239, 68, 68, 0.4), inset 0 2px 5px rgba(255,255,255,0.3);
-            transition: all 0.2s ease;
-        }
-        .sos-btn:active {
-            transform: translateY(2px) scale(0.95);
-            box-shadow: 0 0 5px rgba(239, 68, 68, 0.4), inset 0 4px 8px rgba(0,0,0,0.6);
-        }
-
-        /* Scrollbars */
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
-
-        /* SOS Overlay */
-        #sos-overlay {
-            background: rgba(10, 0, 0, 0.95);
-            backdrop-filter: blur(10px);
-            opacity: 0; pointer-events: none;
-            transition: opacity 0.3s ease;
-            z-index: 9999;
-        }
-        #sos-overlay.active { opacity: 1; pointer-events: auto; }
-        
-        .sos-pulse-bg {
-            position: absolute; inset: 0;
-            background: radial-gradient(circle at 50% 50%, rgba(211, 47, 47, 0.2) 0%, transparent 70%);
-            animation: emergency-pulse 1s infinite alternate;
-        }
-        @keyframes emergency-pulse {
-            0% { opacity: 0.5; transform: scale(0.95); }
-            100% { opacity: 1; transform: scale(1.05); }
-        }
-
-        .hud-scanline {
-            position: absolute; top: 0; left: 0; width: 100%; height: 2px;
-            background: rgba(255, 61, 0, 0.5);
+        .neon-input-container::after {
+            content: '';
+            position: absolute;
+            bottom: 0; left: 50%;
+            transform: translateX(-50%);
+            width: 0; height: 2px;
+            background: #FF3D00;
+            transition: width 0.3s ease, box-shadow 0.3s ease;
             box-shadow: 0 0 10px #FF3D00;
-            animation: scanline 3s linear infinite;
-            z-index: 50; opacity: 0.5; pointer-events: none;
         }
-        @keyframes scanline {
-            0% { top: 0%; }
-            100% { top: 100%; }
+        .neon-input-container:focus-within::after { width: 100%; }
+
+        .neon-input {
+            background: rgba(0,0,0,0.6);
+            border: 1px solid #333;
+            color: #fff;
+            transition: all 0.3s ease;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.8);
+        }
+        .neon-input:focus {
+            outline: none;
+            border-color: rgba(255, 61, 0, 0.5);
+            background: rgba(20, 5, 0, 0.6);
         }
 
-        /* NEW Additions for Heading & Trails */
-        .bike-rotation-wrapper {
-            transition: transform 0.5s ease-out;
-            width: 100%; height: 100%;
+        .key-fob {
+            background: linear-gradient(145deg, #222, #050505);
+            box-shadow: 5px 5px 10px #000, -2px -2px 5px rgba(255,255,255,0.05), inset 0 0 10px rgba(0,0,0,0.8);
+            position: relative;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .key-fob::after {
+            content: ''; position: absolute; inset: 4px;
+            border-radius: 50%; border: 1px dashed rgba(255,255,255,0.2);
+            transition: all 0.3s ease;
+        }
+        .key-fob:active { box-shadow: inset 5px 5px 10px #000; }
+        .key-fob:hover::after { border-color: rgba(255,61,0,0.5); }
+        .key-fob.turning::after { border-color: #FF3D00; transform: rotate(45deg); }
+        .key-icon-turn { transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s; }
+        .key-fob.turning .key-icon-turn { transform: rotate(90deg); color: #FF3D00; }
+
+        /* Dynamic Ignition 2.0 */
+        .ignition-wrapper {
+            position: relative; width: 100px; height: 100px;
             display: flex; align-items: center; justify-content: center;
         }
+        .ignition-ring {
+            position: absolute; inset: 0;
+            border-radius: 50%; border: 2px dashed #444;
+            transition: all 0.5s ease;
+        }
+        .ignition-btn {
+            width: 80px; height: 80px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #2a2b2e 0%, #111 100%);
+            border: 2px solid #333;
+            position: relative; cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex; align-items: center; justify-content: center;
+            z-index: 2;
+        }
+        .ignition-btn::before {
+            content: ''; position: absolute; inset: 6px;
+            border-radius: 50%; background: linear-gradient(135deg, #1a1a1a, #050505);
+            border: 1px solid #444; transition: all 0.3s ease;
+        }
+        
+        .glowing .ignition-ring {
+            border-color: #FF3D00; animation: spin-slow 10s linear infinite;
+            box-shadow: 0 0 20px rgba(255, 61, 0, 0.2);
+        }
+        .glowing .ignition-btn::before {
+            background: radial-gradient(circle, #FF3D00 0%, #8a2100 100%);
+            box-shadow: inset 0 0 10px #000, 0 0 30px rgba(255, 61, 0, 0.6);
+            border-color: #ff7a55; animation: heartbeat 1.5s infinite;
+        }
+        .glowing.success .ignition-btn::before {
+            background: radial-gradient(circle, #22c55e 0%, #14532d 100%);
+            box-shadow: inset 0 0 10px #000, 0 0 40px rgba(34, 197, 94, 0.8);
+            border-color: #4ade80; animation: none;
+        }
+        .glowing.success .ignition-ring {
+            border-color: #22c55e; animation: spin-fast 1s ease-out forwards;
+        }
+        .ignition-btn:active { transform: scale(0.92); }
 
-        /* Connecting overlay */
-        #connecting-overlay {
-            position: absolute; inset: 0; z-index: 99999;
-            background: #050505; display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
-            transition: opacity 0.5s ease;
+        @keyframes heartbeat {
+            0%, 30%, 100% { transform: scale(1); filter: brightness(1); }
+            15%, 45% { transform: scale(1.05); filter: brightness(1.2); }
+        }
+        @keyframes spin-slow { 100% { transform: rotate(360deg); } }
+        @keyframes spin-fast { 100% { transform: rotate(720deg); } }
+
+        /* View transitions */
+        .view-container { perspective: 1200px; }
+        .view-frame { transition: all 0.6s cubic-bezier(0.25, 1, 0.5, 1); }
+
+        /* Toast HUD */
+        #toast {
+            transform: translateY(-20px) scale(0.9);
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            opacity: 0; pointer-events: none; backdrop-filter: blur(15px);
+        }
+        #toast.show { transform: translateY(0) scale(1); opacity: 1; }
+
+        /* HIGH-END PAGE TRANSITION EFFECTS */
+        .content-fade-out {
+            transform: scale(0.92) translateY(30px) !important;
+            filter: blur(18px) brightness(0.3) !important;
+            opacity: 0 !important;
+            transition: all 1.2s cubic-bezier(0.7, 0, 0.3, 1) !important;
+            pointer-events: none;
+        }
+        
+        #page-transition-overlay {
+            backdrop-filter: blur(0px);
+            -webkit-backdrop-filter: blur(0px);
+        }
+        #page-transition-overlay.engaging {
+            background-color: rgba(0, 0, 0, 1) !important;
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            pointer-events: all;
         }
     </style>
 </head>
 <body>
 
-    <main class="device-frame dashboard-bg relative">
-        <div class="tread-pattern"></div>
-        <div class="hud-scanline"></div>
+    <!-- Main Device Frame -->
+    <main class="device-frame dashboard-bg">
+        
+        <!-- Background Textures -->
+        <div class="tread-pattern transition-all duration-1000" id="tread-bg"></div>
+        <div class="hud-corner hud-tl transition-opacity duration-500" id="corner-1"></div>
+        <div class="hud-corner hud-tr transition-opacity duration-500" id="corner-2"></div>
+        <div class="hud-corner hud-bl transition-opacity duration-500" id="corner-3"></div>
+        <div class="hud-corner hud-br transition-opacity duration-500" id="corner-4"></div>
 
-        <!-- Initializing Screen -->
-        <div id="connecting-overlay">
-            <i class="ph-bold ph-spinner animate-spin text-4xl text-brand-orange mb-4"></i>
-            <span class="font-mono text-xs text-brand-light tracking-widest uppercase">Initializing Uplink...</span>
+        <!-- Garage Shutter Overlay -->
+        <div id="garage-shutter" class="shutter-image-container">
+            <div class="vignette-overlay"></div>
+            <div id="floor-glow" class="floor-glow"></div>
         </div>
 
-        <!-- Top Header HUD -->
-        <header class="absolute top-0 w-full z-50 pt-10 pb-4 px-6 flex justify-between items-end bg-gradient-to-b from-[#050505] via-[#050505]/80 to-transparent pointer-events-none">
-            <div class="flex flex-col">
-                <span class="text-[9px] font-mono text-brand-orange uppercase tracking-[0.3em] mb-1 flex items-center gap-1">
-                    <span id="gps-indicator" class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span> <span id="gps-status-text">Acquiring GPS</span>
-                </span>
-                <h1 class="font-display text-2xl font-black tracking-widest uppercase italic text-white drop-shadow-[0_0_10px_rgba(255,61,0,0.3)] leading-none pointer-events-auto">
+        <!-- Dashboard Layout -->
+        <div id="app-content" class="flex flex-col h-full w-full relative z-10 p-6 py-8 transform transition-all duration-[1200ms]">
+            
+            <!-- TOP AREA: Typographic Title -->
+            <div class="stagger-item flex-shrink-0 flex flex-col w-full z-20 px-2 text-center" style="transition-delay: 0.1s;">
+                <h1 class="font-display text-4xl font-black tracking-widest uppercase italic text-white drop-shadow-[0_0_15px_rgba(255,61,0,0.3)] leading-none">
                     Ride<span class="text-brand-orange">Sync</span>
                 </h1>
             </div>
-            
-            <div class="flex flex-col items-end text-right pointer-events-auto">
-                <span id="header-speed" class="font-mono text-xl font-bold text-white tracking-wider">0<span class="text-[10px] text-brand-light ml-1">KPH</span></span>
-                <span id="header-alt" class="font-mono text-[10px] text-brand-light tracking-widest mt-0.5"><i class="ph-bold ph-arrow-up-right text-brand-orange"></i> <span id="alt-val">--</span> ALT</span>
-                <span id="header-weather" class="font-mono text-[10px] text-blue-400 tracking-widest mt-1 hidden"><i class="ph-fill ph-thermometer text-blue-500"></i> <span id="weather-val">--</span>°C</span>
-            </div>
-        </header>
 
-        <!-- Main Content Area -->
-        <div id="content-area" class="flex-grow relative overflow-hidden w-full h-full">
-            
-            <!-- VIEW: MAP -->
-            <div id="view-map" class="view-panel active">
-                <div id="map" class="w-full h-full z-10"></div>
-                
-                <div class="absolute top-28 left-4 z-20 glass-capsule rounded-xl p-2 flex flex-col gap-2">
-                    <button class="w-8 h-8 rounded bg-brand-dark border border-brand-metal flex items-center justify-center text-brand-light hover:text-white hover:border-brand-orange transition-colors" onclick="recenterMap()">
-                        <i class="ph-bold ph-crosshair text-lg"></i>
-                    </button>
-                </div>
-
-                <div class="absolute top-28 right-4 z-20 glass-capsule px-3 py-1.5 rounded-lg flex items-center gap-2 border border-brand-orange/30">
-                    <i class="ph-fill ph-users-three text-brand-orange text-sm"></i>
-                    <span class="font-mono text-[10px] font-bold tracking-widest uppercase" id="pack-count-display">SOLO RIDER</span>
-                </div>
+            <!-- MIDDLE AREA: Dynamic Slider -->
+            <div class="flex-grow w-full relative z-20 overflow-hidden my-4" id="motive-slider">
+                <!-- Javascript will inject sliding data items here -->
             </div>
 
-            <!-- VIEW: GROUPS/PACK -->
-            <div id="view-groups" class="view-panel px-5 overflow-y-auto">
+            <!-- BOTTOM AREA: Fixed height container for Buttons & Forms -->
+            <div class="relative w-full h-[220px] flex-shrink-0 view-container">
                 
-                <!-- If not in a group -->
-                <div id="group-setup-ui" class="space-y-6 mt-4">
-                    <div class="text-center mb-6">
-                        <i class="ph-duotone ph-share-network text-5xl text-brand-orange mb-2"></i>
-                        <h2 class="font-display text-xl font-bold tracking-widest uppercase">Form a Pack</h2>
-                        <p class="font-mono text-xs text-brand-light mt-2">Connect to a live telemetry mesh network to track riders in real-time.</p>
-                    </div>
-
-                    <div class="bg-brand-gray border border-brand-metal rounded-xl p-5">
-                        <h3 class="font-display text-sm font-bold tracking-widest uppercase text-brand-light mb-3">Join Existing</h3>
-                        <div class="flex gap-2">
-                            <input type="text" id="join-group-id" placeholder="ENTER 6-DIGIT ID" class="flex-grow bg-brand-dark border border-brand-metal rounded-lg px-4 py-3 font-mono text-center tracking-[0.2em] uppercase focus:outline-none focus:border-brand-orange transition-colors">
-                            <button onclick="handleJoinGroup()" class="bg-brand-orange text-white px-5 rounded-lg font-display font-bold tracking-wider active:scale-95 transition-transform">JOIN</button>
-                        </div>
-                    </div>
-
-                    <div class="relative flex items-center py-2">
-                        <div class="flex-grow border-t border-brand-metal"></div>
-                        <span class="flex-shrink-0 mx-4 font-mono text-xs text-brand-light">OR</span>
-                        <div class="flex-grow border-t border-brand-metal"></div>
-                    </div>
-
-                    <button onclick="handleCreateGroup()" class="w-full bg-transparent border-2 border-brand-orange text-brand-orange py-4 rounded-xl font-display font-bold tracking-widest uppercase hover:bg-brand-orange/10 active:scale-95 transition-all flex items-center justify-center gap-2">
-                        <i class="ph-bold ph-plus-circle text-lg"></i> Create New Pack
-                    </button>
-                </div>
-
-                <!-- If in a group -->
-                <div id="group-active-ui" class="hidden flex-col h-full">
-                    <div class="flex items-center justify-between mb-4 bg-brand-gray border border-brand-orange/50 rounded-xl p-4 shadow-neon">
-                        <div>
-                            <span class="font-mono text-[10px] text-brand-light tracking-widest block mb-1">SECURE CHANNEL LINKED</span>
-                            <h2 class="font-display text-2xl font-bold tracking-widest uppercase text-white" id="current-group-id-display">------</h2>
-                        </div>
-                        <button onclick="handleLeaveGroup()" class="w-10 h-10 rounded-full bg-brand-red/20 border border-brand-red text-brand-red flex items-center justify-center hover:bg-brand-red hover:text-white transition-colors">
-                            <i class="ph-bold ph-sign-out"></i>
-                        </button>
-                    </div>
+                <!-- VIEW 1: Main Login Options -->
+                <div id="view-main" class="view-frame absolute w-full bottom-0 transform origin-bottom flex flex-col justify-end gap-4 z-20 opacity-100 h-full">
                     
-                    <h3 class="font-display text-sm font-bold tracking-widest uppercase text-brand-light mb-4 pl-1 border-l-2 border-brand-orange">Active Riders</h3>
-                    
-                    <div id="riders-list" class="space-y-3 pb-24">
-                        <!-- Dynamic riders injected here -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- VIEW: MESSAGES/COMMS -->
-            <div id="view-messages" class="view-panel px-5 overflow-hidden flex flex-col">
-                <div class="flex items-center justify-between mb-4 shrink-0">
-                    <h2 class="font-display text-lg font-bold tracking-widest uppercase border-l-2 border-brand-orange pl-3">Comms Link</h2>
-                    <i class="ph-bold ph-faders text-brand-light text-xl"></i>
-                </div>
-                
-                <div id="chat-container" class="flex-grow overflow-y-auto space-y-3 pb-4 pr-1 scroll-smooth">
-                    <div class="bg-brand-gray border border-brand-metal rounded-xl p-3 flex items-center gap-3 opacity-50">
-                        <div class="w-10 h-10 rounded-full bg-brand-dark flex items-center justify-center shrink-0">
-                            <i class="ph-bold ph-microphone-slash text-brand-light"></i>
-                        </div>
-                        <div class="flex-grow">
-                            <p class="text-xs text-brand-light font-mono">Join a pack to enable secure communications.</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="shrink-0 pb-24 pt-2">
-                    <form id="chat-form" onsubmit="handleSendChat(event)" class="flex gap-2 hidden">
-                        <input type="text" id="chat-input" placeholder="Transmit message..." class="flex-grow bg-brand-dark border border-brand-metal rounded-lg px-4 py-3 font-mono text-xs focus:outline-none focus:border-brand-orange transition-colors" autocomplete="off">
-                        <button type="submit" class="bg-brand-orange text-white w-12 rounded-lg flex items-center justify-center hover:bg-[#d83500] active:scale-95 transition-transform">
-                            <i class="ph-bold ph-paper-plane-right"></i>
+                    <div class="p-2 flex flex-col gap-5 w-full bg-transparent mt-auto">
+                        
+                        <!-- Google Capsule -->
+                        <button onclick="mockAction('Google Secure', this)" class="capsule-btn capsule-google">
+                            <i class="ph-fill ph-google-logo text-xl"></i>
+                            <span>Google Sign In</span>
                         </button>
-                    </form>
-                </div>
-            </div>
 
-            <!-- VIEW: PROFILE/TELEMETRY -->
-            <div id="view-profile" class="view-panel px-5 overflow-y-auto">
-                <div class="flex flex-col items-center mt-2 mb-8">
-                    <div class="relative mb-4">
-                        <div class="w-24 h-24 rounded-full border-4 border-[#141414] shadow-neon overflow-hidden bg-brand-metal relative z-10">
-                            <img id="profile-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=SyncUser&backgroundColor=2A2B2E" class="w-full h-full object-cover">
+                        <!-- Mobile Capsule -->
+                        <button onclick="switchView('view-phone')" class="capsule-btn capsule-phone">
+                            <i class="ph-bold ph-device-mobile text-xl"></i>
+                            <span>Mobile Sign In</span>
+                        </button>
+
+                    </div>
+                </div>
+
+                <!-- VIEW 2: Phone Input & Ignition -->
+                <div id="view-phone" class="view-frame absolute w-full bottom-0 transform origin-bottom translate-y-12 scale-[0.92] opacity-0 pointer-events-none flex flex-col justify-end gap-2 z-10 h-full">
+                    
+                    <button onclick="switchView('view-main')" class="absolute top-0 left-2 flex items-center gap-2 text-brand-light hover:text-white active:text-brand-orange transition-colors py-1 mb-2 group z-30">
+                        <div class="w-8 h-8 rounded-full border border-brand-light group-hover:border-white flex items-center justify-center transition-colors">
+                            <i class="ph-bold ph-caret-left text-sm"></i>
                         </div>
-                        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-28 h-28 border border-brand-orange/30 rounded-full z-0 rotate-45 pointer-events-none border-dashed animate-[spin_10s_linear_infinite]"></div>
-                    </div>
-                    <h2 id="profile-name" class="font-display text-xl font-bold tracking-widest uppercase">Rider_Zero</h2>
-                    <span class="font-mono text-xs text-brand-orange tracking-[0.2em] mt-1">OPERATIVE</span>
-                </div>
-
-                <div class="grid grid-cols-2 gap-3 mb-6">
-                    <div class="bg-brand-gray border border-brand-metal p-4 rounded-xl flex flex-col items-center justify-center">
-                        <i class="ph-duotone ph-map-pin text-brand-light text-2xl mb-2"></i>
-                        <span class="font-mono text-[10px] text-brand-light tracking-widest mb-1">LAT</span>
-                        <span id="stat-lat" class="font-mono font-bold text-sm">--.----</span>
-                    </div>
-                    <div class="bg-brand-gray border border-brand-metal p-4 rounded-xl flex flex-col items-center justify-center">
-                        <i class="ph-duotone ph-map-pin text-brand-light text-2xl mb-2"></i>
-                        <span class="font-mono text-[10px] text-brand-light tracking-widest mb-1">LNG</span>
-                        <span id="stat-lng" class="font-mono font-bold text-sm">--.----</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- FLOATING NAVIGATION CAPSULE -->
-        <div class="absolute bottom-6 left-1/2 -translate-x-1/2 w-[92%] z-50">
-            <nav class="glass-capsule rounded-full py-2 px-4 flex items-center justify-between shadow-2xl">
-                
-                <button class="nav-item active flex flex-col items-center justify-center w-12 h-12 rounded-full" onclick="switchTab('view-map', this)">
-                    <i class="ph-bold ph-map-trifold text-2xl"></i>
-                </button>
-                
-                <button class="nav-item flex flex-col items-center justify-center w-12 h-12 rounded-full relative" onclick="switchTab('view-groups', this)">
-                    <i class="ph-bold ph-users-three text-2xl"></i>
-                    <div id="nav-pack-indicator" class="absolute top-1 right-2 w-2 h-2 rounded-full bg-brand-orange shadow-[0_0_5px_#FF3D00] hidden"></div>
-                </button>
-
-                <!-- Central SOS Trigger -->
-                <div class="relative -top-5 mx-2">
-                    <div class="absolute inset-0 bg-brand-red rounded-full opacity-20 blur-md"></div>
-                    <button class="sos-btn w-16 h-16 rounded-full flex flex-col items-center justify-center relative z-10" onclick="triggerSOS()">
-                        <i class="ph-fill ph-warning text-white text-3xl mb-0.5"></i>
-                        <span class="text-[8px] font-display font-black text-white tracking-widest uppercase">SOS</span>
+                        <span class="text-[11px] font-bold uppercase tracking-widest font-mono">Abort Protocol</span>
                     </button>
+
+                    <div class="p-2 flex flex-col gap-4 w-full bg-transparent mt-auto">
+                        <form onsubmit="handlePhoneSubmit(event)" class="space-y-4">
+                            
+                            <!-- Phone Input -->
+                            <div id="phone-input-group" class="flex gap-3 transition-all duration-400">
+                                <div class="neon-input-container relative w-24">
+                                    <select class="neon-input w-full h-14 pl-3 pr-8 rounded-xl text-sm appearance-none font-bold text-center font-display tracking-wider">
+                                        <option>+1</option>
+                                        <option>+44</option>
+                                        <option>+91</option>
+                                    </select>
+                                    <i class="ph-bold ph-caret-down absolute right-3 top-1/2 -translate-y-1/2 text-brand-light pointer-events-none text-xs"></i>
+                                </div>
+                                <div class="neon-input-container flex-grow">
+                                    <input type="tel" id="phone-input" required placeholder="000-000-0000" pattern="[0-9]*" class="neon-input w-full h-14 px-4 rounded-xl text-lg font-bold tracking-widest font-mono" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                                </div>
+                            </div>
+
+                            <!-- OTP Sequence -->
+                            <div id="otp-section" class="hidden flex-col items-center gap-4 pt-2">
+                                <div class="w-full flex items-center gap-3">
+                                    <div class="h-px bg-brand-orange opacity-30 flex-grow"></div>
+                                    <label class="text-[9px] font-mono text-brand-orange uppercase tracking-[0.3em] animate-pulse">Awaiting Ignition Code</label>
+                                    <div class="h-px bg-brand-orange opacity-30 flex-grow"></div>
+                                </div>
+                                
+                                <div class="flex gap-3 justify-center w-full">
+                                    <div class="neon-input-container"><input type="text" maxlength="1" inputmode="numeric" class="otp-box neon-input w-11 h-14 text-center text-xl font-bold rounded-xl font-mono"></div>
+                                    <div class="neon-input-container"><input type="text" maxlength="1" inputmode="numeric" class="otp-box neon-input w-11 h-14 text-center text-xl font-bold rounded-xl font-mono"></div>
+                                    <div class="neon-input-container"><input type="text" maxlength="1" inputmode="numeric" class="otp-box neon-input w-11 h-14 text-center text-xl font-bold rounded-xl font-mono"></div>
+                                    <div class="neon-input-container"><input type="text" maxlength="1" inputmode="numeric" class="otp-box neon-input w-11 h-14 text-center text-xl font-bold rounded-xl font-mono"></div>
+                                </div>
+
+                                <!-- The Push-to-Start Button -->
+                                <div class="mt-2 flex flex-col items-center gap-4">
+                                    <div id="ignition-wrapper" class="ignition-wrapper">
+                                        <div class="ignition-ring"></div>
+                                        <button type="submit" id="ignition-btn" class="ignition-btn shadow-machined" disabled>
+                                            <i id="ignition-icon" class="ph-bold ph-power text-2xl text-brand-dark z-10 opacity-50 transition-all"></i>
+                                        </button>
+                                    </div>
+                                    <span class="text-[10px] font-display text-brand-light uppercase tracking-[0.2em] -mt-2">Push to Ignite</span>
+                                </div>
+                            </div>
+
+                            <!-- Initial Send Button (Key Fob) -->
+                            <div class="w-full flex flex-col items-center justify-center mt-2 pb-2" id="key-submit-container">
+                                <button type="submit" id="phone-submit-btn" class="key-fob w-16 h-16 rounded-full flex items-center justify-center outline-none group border-2 border-[#1a1a1a]">
+                                    <i id="key-icon" class="ph-fill ph-key text-2xl text-brand-light group-hover:text-white key-icon-turn"></i>
+                                </button>
+                                <span class="text-[9px] font-mono uppercase text-brand-orange tracking-[0.2em] mt-3 opacity-70">Turn Key to Transmit</span>
+                            </div>
+                        </form>
+                    </div>
                 </div>
-
-                <button class="nav-item flex flex-col items-center justify-center w-12 h-12 rounded-full" onclick="switchTab('view-messages', this)">
-                    <i class="ph-bold ph-chat-teardrop-text text-2xl"></i>
-                </button>
-                
-                <button class="nav-item flex flex-col items-center justify-center w-12 h-12 rounded-full" onclick="switchTab('view-profile', this)">
-                    <i class="ph-bold ph-user-circle-gear text-2xl"></i>
-                </button>
-
-            </nav>
-        </div>
-
-        <!-- INCOMING GLOBAL SOS BANNER -->
-        <div id="incoming-sos-banner" class="absolute top-24 left-1/2 -translate-x-1/2 w-[90%] bg-[#450a0a] border-2 border-brand-red rounded-xl p-4 shadow-neon-red z-[9999] hidden flex-col items-center text-center animate-bounce">
-            <i class="ph-fill ph-warning-octagon text-4xl text-white mb-2 animate-pulse"></i>
-            <h3 class="font-display font-black text-white uppercase tracking-widest mb-1 text-lg">DISTRESS BEACON</h3>
-            <span id="incoming-sos-name" class="font-mono text-xs text-white mb-3">A Rider has triggered SOS</span>
-            <button onclick="document.getElementById('incoming-sos-banner').classList.replace('flex', 'hidden')" class="bg-black/50 border border-brand-red text-white px-6 py-2 rounded-full font-bold text-xs uppercase tracking-wider">Acknowledge</button>
-        </div>
-
-        <!-- SOS EMERGENCY OVERLAY MODAL -->
-        <div id="sos-overlay" class="absolute inset-0 flex flex-col items-center justify-center px-6">
-            <div class="sos-pulse-bg"></div>
-            
-            <div class="z-10 flex flex-col items-center text-center max-w-[300px]">
-                <i class="ph-fill ph-warning-octagon text-7xl text-brand-red mb-4 drop-shadow-neon-red animate-pulse"></i>
-                <h2 class="font-display text-3xl font-black text-white tracking-widest uppercase mb-2">Emergency</h2>
-                <p class="font-mono text-sm text-brand-light mb-8 opacity-90">Transmitting distress beacon with exact coordinates to Pack and EMS.</p>
-                
-                <div class="text-7xl font-mono font-bold text-white mb-8 tracking-tighter" id="sos-timer">10</div>
-
-                <button class="w-full bg-brand-dark border border-brand-metal py-4 rounded-full font-display font-bold tracking-widest text-brand-light uppercase shadow-capsule active:bg-[#1a1a1a] transition" onclick="cancelSOS()">
-                    Abort Protocol
-                </button>
             </div>
         </div>
+
+        <!-- Custom HUD Toast -->
+        <div id="toast" class="absolute top-16 left-1/2 -translate-x-1/2 w-[90%] max-w-[350px] bg-[#111]/90 border border-brand-orange/40 rounded-xl p-3 shadow-2xl z-[200] flex items-center gap-3">
+            <div class="w-8 h-8 rounded-full bg-brand-dark flex items-center justify-center border border-brand-metal">
+                <i id="toast-icon" class="ph-bold ph-info text-brand-orange text-lg"></i>
+            </div>
+            <span id="toast-msg" class="text-[11px] font-mono tracking-wide text-white uppercase mt-0.5"></span>
+        </div>
+        
+        <!-- HIGH-END REDIRECT OVERLAY -->
+        <div id="page-transition-overlay" class="absolute inset-0 z-[300] bg-black/0 pointer-events-none transition-all duration-[1200ms] ease-in-out flex items-center justify-center">
+            <div id="transition-logo" class="opacity-0 scale-50 transition-all duration-[800ms] transform flex flex-col items-center justify-center mt-8">
+                <i class="ph-fill ph-engine text-6xl text-brand-orange mb-4 drop-shadow-[0_0_20px_rgba(255,61,0,0.8)] animate-pulse"></i>
+                <span class="font-display text-lg font-black tracking-[0.4em] text-white uppercase drop-shadow-md">Syncing</span>
+            </div>
+        </div>
+
     </main>
 
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    
-    <script type="module">
-        // Import Firebase modules
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot, collection, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    <script>
+        // --- 1. Cinematic Startup Sequence ---
+        document.addEventListener("DOMContentLoaded", () => {
+            const shutter = document.getElementById('garage-shutter');
+            const floorGlow = document.getElementById('floor-glow');
+            const appContent = document.getElementById('app-content');
 
-        // Global State
-        let userId = null;
-        let displayName = "Rider_" + Math.floor(Math.random() * 1000);
-        let currentGroupId = null;
-        let unsubscribeRiders = null;
-        let unsubscribeChat = null;
-        let map = null;
-        let myMarker = null;
-        let packMarkers = {}; // Stores leaflet markers for other riders
-        let routePolyline = null;
-        let routeCoordinates = [];
-        let hasFetchedWeather = false;
-        
-        let myData = {
-            lat: 12.9716, // Default to Bengaluru initially
-            lng: 77.5946,
-            speed: 0,
-            alt: 0,
-            heading: 0,
-            status: 'NOMINAL',
-            updatedAt: Date.now()
-        };
-        let locationLocked = false;
+            initMotiveSlider();
 
-        // Firebase Setup
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'demo-ridesync-1';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+            setTimeout(() => {
+                shutter.style.transform = 'translateY(-2px)';
+                floorGlow.style.opacity = '1'; 
+                if (navigator.vibrate) navigator.vibrate([40, 60, 40]);
+            }, 1300);
 
-        // UI Helpers
-        window.switchTab = (targetId, btnElement) => {
-            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-            if(btnElement) btnElement.classList.add('active');
-
-            document.querySelectorAll('.view-panel').forEach(el => el.classList.remove('active'));
-            document.getElementById(targetId).classList.add('active');
-
-            if (targetId === 'view-map' && map) {
-                setTimeout(() => map.invalidateSize(), 100);
-            }
-            if (navigator.vibrate) navigator.vibrate(20);
-        };
-
-        window.recenterMap = () => {
-            if(map && locationLocked) {
-                map.setView([myData.lat, myData.lng], 16, { animate: true, duration: 1 });
-                if (navigator.vibrate) navigator.vibrate(30);
-            }
-        };
-
-        function generateAvatarUrl(seed) {
-            return `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}&backgroundColor=2A2B2E`;
-        }
-
-        async function initApp() {
-            try {
-                // Auth - added strict check for empty tokens
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
+            setTimeout(() => {
+                shutter.style.transform = ''; 
+                shutter.classList.add('shutter-open');
+                if (navigator.vibrate) navigator.vibrate(150); 
                 
-                if(!auth.currentUser) throw new Error("Auth failed");
-                userId = auth.currentUser.uid;
-                
-                // Set Profile Data
-                document.getElementById('profile-name').innerText = displayName;
-                document.getElementById('profile-avatar').src = generateAvatarUrl(userId);
+                appContent.classList.add('dashboard-revealed');
+            }, 1500);
 
-            } catch (err) {
-                console.warn("Firebase Auth Error (Running in Local Mode):", err);
-                document.getElementById('gps-status-text').innerText = "Offline Mode";
-            } finally {
-                // Always execute map and GPS init, even if auth fails
-                try {
-                    initLeafletMap();
-                    startTracking();
-                } catch(e) {
-                    console.error("Map/GPS Error:", e);
-                }
-
-                // Remove loading overlay safely
-                const overlay = document.getElementById('connecting-overlay');
-                if (overlay) {
-                    overlay.style.opacity = '0';
-                    setTimeout(() => overlay.remove(), 500);
-                }
-            }
-        }
-
-        function initLeafletMap() {
-            map = L.map('map', { zoomControl: false, attributionControl: false }).setView([myData.lat, myData.lng], 14);
-            L.control.zoom({ position: 'topright' }).addTo(map);
-
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                maxZoom: 19, attribution: ''
-            }).addTo(map);
-
-            // Add Trail Polyline
-            routePolyline = L.polyline([], {color: '#FF3D00', weight: 4, opacity: 0.6, className: 'drop-shadow-[0_0_5px_#FF3D00]'}).addTo(map);
-
-            // My Custom Marker
-            const myBikeIcon = L.divIcon({
-                className: 'custom-user-marker',
-                html: `
-                    <div class="relative">
-                        <div class="ping-ring"></div>
-                        <div class="bike-rotation-wrapper">
-                            <div class="w-10 h-10 bg-[#050505] rounded-full border-2 border-brand-orange flex items-center justify-center shadow-neon z-10 relative">
-                                <i class="ph-fill ph-navigation-arrow text-brand-orange text-xl transform -rotate-45"></i>
-                            </div>
-                        </div>
-                    </div>
-                `, iconSize: [40, 40], iconAnchor: [20, 20]
-            });
-
-            myMarker = L.marker([myData.lat, myData.lng], {icon: myBikeIcon}).addTo(map);
-        }
-
-        async function fetchWeather(lat, lng) {
-            try {
-                const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current_weather=true`);
-                const data = await res.json();
-                document.getElementById('weather-val').innerText = Math.round(data.current_weather.temperature);
-                document.getElementById('header-weather').classList.remove('hidden');
-                hasFetchedWeather = true;
-            } catch(e) { console.warn("Weather fetch failed"); }
-        }
-
-        function startTracking() {
-            if (!navigator.geolocation) {
-                document.getElementById('gps-status-text').innerText = "GPS Not Supported";
-                return;
-            }
-
-            navigator.geolocation.watchPosition(
-                (position) => {
-                    const { latitude, longitude, speed, altitude, heading } = position.coords;
-                    
-                    myData.lat = latitude;
-                    myData.lng = longitude;
-                    
-                    // Speed is in m/s, convert to kph. Handle null.
-                    myData.speed = speed ? Math.round(speed * 3.6) : 0;
-                    myData.alt = altitude ? Math.round(altitude) : 0;
-                    myData.heading = heading || myData.heading; // Keep old heading if stationary
-                    myData.updatedAt = Date.now();
-
-                    // Update Map Trail
-                    routeCoordinates.push([myData.lat, myData.lng]);
-                    if (routePolyline) routePolyline.setLatLngs(routeCoordinates);
-
-                    // Fetch weather once locked
-                    if(!hasFetchedWeather) fetchWeather(myData.lat, myData.lng);
-
-                    // Update UI Header
-                    document.getElementById('header-speed').innerHTML = `${myData.speed}<span class="text-[10px] text-brand-light ml-1">KPH</span>`;
-                    document.getElementById('alt-val').innerText = `${myData.alt}M`;
-                    
-                    // Update Profile Stats
-                    document.getElementById('stat-lat').innerText = myData.lat.toFixed(4);
-                    document.getElementById('stat-lng').innerText = myData.lng.toFixed(4);
-
-                    // Update Map Marker & Heading
-                    if (myMarker) {
-                        myMarker.setLatLng([myData.lat, myData.lng]);
-                        const wrapper = myMarker.getElement()?.querySelector('.bike-rotation-wrapper');
-                        if (wrapper && myData.heading) wrapper.style.transform = `rotate(${myData.heading}deg)`;
-                    }
-
-                    // First lock pan
-                    if (!locationLocked) {
-                        locationLocked = true;
-                        document.getElementById('gps-indicator').classList.replace('bg-red-500', 'bg-green-500');
-                        document.getElementById('gps-status-text').innerText = "Uplink Secure";
-                        map.setView([myData.lat, myData.lng], 16);
-                    }
-
-                    // Push to Firestore if in a group
-                    pushStatusToFirestore();
-                },
-                (error) => {
-                    console.error("GPS Error", error);
-                    document.getElementById('gps-status-text').innerText = "GPS Signal Lost";
-                    document.getElementById('gps-indicator').classList.replace('bg-green-500', 'bg-red-500');
-                },
-                { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
-            );
-        }
-
-        async function pushStatusToFirestore() {
-            if (!userId || !currentGroupId) return;
-            
-            try {
-                // Rule 1: Use specific public path
-                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'riders', userId);
-                await setDoc(docRef, {
-                    groupId: currentGroupId,
-                    displayName: displayName,
-                    avatar: generateAvatarUrl(userId),
-                    lat: myData.lat,
-                    lng: myData.lng,
-                    speed: myData.speed,
-                    alt: myData.alt,
-                    heading: myData.heading,
-                    status: myData.status,
-                    updatedAt: myData.updatedAt
-                });
-            } catch (err) {
-                console.error("Error pushing status:", err);
-            }
-        }
-
-        function listenToPack() {
-            if (!userId || !currentGroupId) return;
-
-            const ridersRef = collection(db, 'artifacts', appId, 'public', 'data', 'riders');
-            
-            // Rule 2: No complex queries, fetch all and filter in JS memory
-            unsubscribeRiders = onSnapshot(ridersRef, (snapshot) => {
-                const now = Date.now();
-                const packMembers = [];
-
-                snapshot.forEach(docSnap => {
-                    const data = docSnap.data();
-                    
-                    // Filter memory
-                    if (data.groupId === currentGroupId && docSnap.id !== userId) {
-                        // Ignore stale data (older than 3 minutes)
-                        if (now - data.updatedAt < 3 * 60 * 1000) {
-                            packMembers.push({ id: docSnap.id, ...data });
-                        }
-                    }
-                });
-
-                updatePackUI(packMembers);
-                updatePackMarkers(packMembers);
-            }, (error) => {
-                console.error("Pack listener error:", error);
-            });
-        }
-
-        function updatePackMarkers(members) {
-            const activeIds = new Set(members.map(m => m.id));
-            
-            // Remove disconnected riders from map
-            Object.keys(packMarkers).forEach(id => {
-                if (!activeIds.has(id)) {
-                    map.removeLayer(packMarkers[id]);
-                    delete packMarkers[id];
-                }
-            });
-
-            // Update or add riders
-            const packBikeIcon = L.divIcon({
-                className: 'custom-pack-marker',
-                html: `
-                    <div class="bike-rotation-wrapper">
-                        <div class="w-8 h-8 bg-brand-metal rounded-full border-2 border-brand-orange flex items-center justify-center shadow-md opacity-90">
-                            <i class="ph-fill ph-navigation-arrow text-white text-sm transform -rotate-45"></i>
-                        </div>
-                    </div>
-                `, iconSize: [32, 32], iconAnchor: [16, 16]
-            });
-
-            let sosTriggeredBy = null;
-
-            members.forEach(member => {
-                if (packMarkers[member.id]) {
-                    packMarkers[member.id].setLatLng([member.lat, member.lng]);
-                    const wrapper = packMarkers[member.id].getElement()?.querySelector('.bike-rotation-wrapper');
-                    if (wrapper && member.heading) wrapper.style.transform = `rotate(${member.heading}deg)`;
-                } else {
-                    packMarkers[member.id] = L.marker([member.lat, member.lng], {icon: packBikeIcon}).addTo(map);
-                }
-                
-                // Check SOS Status
-                if (member.status === 'SOS') sosTriggeredBy = member.displayName;
-            });
-
-            // Handle Incoming Global SOS
-            const sosBanner = document.getElementById('incoming-sos-banner');
-            if (sosTriggeredBy) {
-                document.getElementById('incoming-sos-name').innerText = `${sosTriggeredBy} HAS TRIGGERED AN SOS`;
-                sosBanner.classList.replace('hidden', 'flex');
-                if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300]);
-            } else {
-                sosBanner.classList.replace('flex', 'hidden');
-            }
-
-            // Update Header count
-            document.getElementById('pack-count-display').innerText = `PACK: ${members.length + 1} ONLINE`;
-            
-            // Update Nav Indicator
-            const indicator = document.getElementById('nav-pack-indicator');
-            if (members.length > 0) indicator.classList.remove('hidden');
-            else indicator.classList.add('hidden');
-        }
-
-        function calculateDistance(lat1, lon1, lat2, lon2) {
-            // Haversine formula for rough distance display
-            const R = 6371; // km
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                      Math.sin(dLon/2) * Math.sin(dLon/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            return (R * c).toFixed(1);
-        }
-
-        function updatePackUI(members) {
-            const listEl = document.getElementById('riders-list');
-            listEl.innerHTML = ''; // Clear
-
-            if (members.length === 0) {
-                listEl.innerHTML = `
-                    <div class="bg-brand-dark border border-brand-metal/50 rounded-xl p-4 text-center">
-                        <span class="font-mono text-xs text-brand-light">AWAITING RIDERS TO JOIN PACK...</span>
-                    </div>
-                `;
-                return;
-            }
-
-            members.forEach(member => {
-                const distanceStr = calculateDistance(myData.lat, myData.lng, member.lat, member.lng);
-                
-                const html = `
-                    <div class="bg-brand-gray border border-brand-metal rounded-xl p-4 flex items-center gap-4 relative overflow-hidden">
-                        <div class="absolute right-0 top-0 w-1 h-full bg-green-500"></div>
-                        <div class="relative shrink-0">
-                            <img src="${member.avatar}" class="w-12 h-12 rounded-full border-2 border-brand-metal">
-                            <div class="absolute -bottom-1 -right-1 w-4 h-4 bg-[#050505] rounded-full flex items-center justify-center">
-                                <div class="w-2.5 h-2.5 bg-green-500 rounded-full"></div>
-                            </div>
-                        </div>
-                        <div class="flex-grow overflow-hidden">
-                            <h3 class="font-display font-bold text-sm tracking-wide truncate">${member.displayName}</h3>
-                            <div class="flex gap-3 text-[10px] font-mono text-brand-light mt-1">
-                                <span class="flex items-center gap-1"><i class="ph-bold ph-navigation-arrow text-brand-orange"></i> ${distanceStr} KM</span>
-                                <span class="flex items-center gap-1"><i class="ph-bold ph-speedometer"></i> ${member.speed} KPH</span>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                listEl.insertAdjacentHTML('beforeend', html);
-            });
-        }
-
-        window.handleCreateGroup = () => {
-            // Generate random 6 char hex ID
-            const newId = Math.random().toString(16).substr(2, 6).toUpperCase();
-            activateGroup(newId);
-        };
-
-        window.handleJoinGroup = () => {
-            const input = document.getElementById('join-group-id');
-            const val = input.value.trim().toUpperCase();
-            if (val.length < 3) {
-                alert("Please enter a valid Group ID");
-                return;
-            }
-            activateGroup(val);
-            input.value = '';
-        };
-
-        function activateGroup(groupId) {
-            currentGroupId = groupId;
-            document.getElementById('group-setup-ui').classList.add('hidden');
-            document.getElementById('group-active-ui').classList.remove('hidden');
-            document.getElementById('group-active-ui').classList.add('flex');
-            document.getElementById('current-group-id-display').innerText = currentGroupId;
-            
-            // Enable Chat UI
-            document.getElementById('chat-form').classList.remove('hidden');
-            
-            pushStatusToFirestore();
-            listenToPack();
-            listenToChat();
-        }
-
-        window.handleLeaveGroup = async () => {
-            if (unsubscribeRiders) { unsubscribeRiders(); unsubscribeRiders = null; }
-            if (unsubscribeChat) { unsubscribeChat(); unsubscribeChat = null; }
-            
-            // Clean up my doc from Firestore
-            if (userId) {
-                try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'riders', userId)); } catch(e) {}
-            }
-
-            currentGroupId = null;
-            
-            document.getElementById('group-setup-ui').classList.remove('hidden');
-            document.getElementById('group-active-ui').classList.add('hidden');
-            document.getElementById('group-active-ui').classList.remove('flex');
-            
-            // Disable Chat UI
-            document.getElementById('chat-form').classList.add('hidden');
-            document.getElementById('chat-container').innerHTML = `
-                <div class="bg-brand-gray border border-brand-metal rounded-xl p-3 flex items-center gap-3 opacity-50">
-                    <div class="w-10 h-10 rounded-full bg-brand-dark flex items-center justify-center shrink-0">
-                        <i class="ph-bold ph-microphone-slash text-brand-light"></i>
-                    </div>
-                    <div class="flex-grow">
-                        <p class="text-xs text-brand-light font-mono">Join a pack to enable secure communications.</p>
-                    </div>
-                </div>`;
-            
-            // Clear UI state
-            document.getElementById('pack-count-display').innerText = `SOLO RIDER`;
-            document.getElementById('nav-pack-indicator').classList.add('hidden');
-            updatePackMarkers([]); // clear map
-        };
-        
-        // --- CHAT LOGIC ---
-        window.handleSendChat = async (e) => {
-            e.preventDefault();
-            const input = document.getElementById('chat-input');
-            const text = input.value.trim();
-            if(!text || !currentGroupId || !userId) return;
-            
-            input.value = '';
-            try {
-                const msgRef = collection(db, 'artifacts', appId, 'public', 'data', 'messages');
-                await setDoc(doc(msgRef), {
-                    groupId: currentGroupId,
-                    senderId: userId,
-                    senderName: displayName,
-                    avatar: generateAvatarUrl(userId),
-                    text: text,
-                    timestamp: Date.now()
-                });
-            } catch(e) { console.error("Chat error", e); }
-        };
-
-        function listenToChat() {
-            if (!currentGroupId) return;
-            const msgRef = collection(db, 'artifacts', appId, 'public', 'data', 'messages');
-            
-            unsubscribeChat = onSnapshot(msgRef, (snapshot) => {
-                let msgs = [];
-                snapshot.forEach(docSnap => {
-                    const data = docSnap.data();
-                    if(data.groupId === currentGroupId) msgs.push(data);
-                });
-                
-                // Sort by timestamp
-                msgs.sort((a,b) => a.timestamp - b.timestamp);
-                
-                const container = document.getElementById('chat-container');
-                container.innerHTML = '';
-                
-                if (msgs.length === 0) {
-                    container.innerHTML = `<div class="text-center p-4 opacity-50"><span class="font-mono text-xs">CHANNEL OPEN. WAITING FOR COMMS...</span></div>`;
-                } else {
-                    msgs.forEach(msg => {
-                        const isMe = msg.senderId === userId;
-                        const timeStr = new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                        
-                        let html = '';
-                        if (isMe) {
-                            html = `
-                            <div class="flex items-end justify-end gap-2 pl-8">
-                                <div class="bg-brand-orange/20 border border-brand-orange text-white rounded-t-xl rounded-l-xl p-3 shadow-neon text-sm font-mono">${msg.text}</div>
-                            </div>`;
-                        } else {
-                            html = `
-                            <div class="flex items-end gap-2 pr-8">
-                                <img src="${msg.avatar}" class="w-8 h-8 rounded-full border border-brand-metal shrink-0">
-                                <div>
-                                    <span class="text-[9px] font-mono text-brand-light ml-1 block mb-0.5">${msg.senderName} • ${timeStr}</span>
-                                    <div class="bg-brand-gray border border-brand-metal text-brand-light rounded-t-xl rounded-r-xl p-3 text-sm font-mono">${msg.text}</div>
-                                </div>
-                            </div>`;
-                        }
-                        container.insertAdjacentHTML('beforeend', html);
-                    });
-                }
-                // Auto-scroll to bottom
-                container.scrollTop = container.scrollHeight;
-            });
-        }
-
-        let sosInterval;
-        let countdown = 10;
-        
-        window.triggerSOS = () => {
-            const overlay = document.getElementById('sos-overlay');
-            const timerEl = document.getElementById('sos-timer');
-            
-            if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
-            
-            countdown = 10;
-            timerEl.innerText = countdown;
-            overlay.classList.add('active');
-            
-            clearInterval(sosInterval);
-            sosInterval = setInterval(() => {
-                countdown--;
-                timerEl.innerText = countdown;
-                if (navigator.vibrate) navigator.vibrate(50);
-                
-                if (countdown <= 0) {
-                    clearInterval(sosInterval);
-                    timerEl.innerText = "SENT";
-                    timerEl.classList.add("text-brand-orange");
-                    if (navigator.vibrate) navigator.vibrate(1000); 
-                    
-                    // Activate SOS on Network
-                    myData.status = 'SOS';
-                    pushStatusToFirestore();
-                }
-            }, 1000);
-        };
-
-        window.cancelSOS = () => {
-            const overlay = document.getElementById('sos-overlay');
-            const timerEl = document.getElementById('sos-timer');
-            clearInterval(sosInterval);
-            overlay.classList.remove('active');
-            timerEl.classList.remove("text-brand-orange");
-            if (navigator.vibrate) navigator.vibrate([40, 40]);
-            
-            // Deactivate SOS
-            if(myData.status === 'SOS') {
-                myData.status = 'NOMINAL';
-                pushStatusToFirestore();
-            }
-        };
-
-        // Cleanup on exit to prevent ghost markers
-        window.addEventListener("beforeunload", (ev) => {
-            if (userId) {
-                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'riders', userId);
-                deleteDoc(docRef);
-            }
+            setTimeout(() => { shutter.remove(); }, 3500);
         });
 
-        // Bootstrap App
-        window.addEventListener('DOMContentLoaded', initApp);
+        // --- 2. View Switching Logic ---
+        function switchView(target) {
+            const main = document.getElementById('view-main');
+            const phone = document.getElementById('view-phone');
+
+            if (target === 'view-phone') {
+                main.style.transform = 'translateY(-30px) scale(0.92) rotateX(10deg)';
+                main.style.opacity = '0';
+                main.classList.add('pointer-events-none');
+
+                phone.style.transform = 'translateY(0) scale(1) rotateX(0deg)';
+                phone.style.opacity = '1';
+                phone.classList.remove('pointer-events-none');
+                
+                setTimeout(() => document.getElementById('phone-input').focus(), 600);
+            } else {
+                phone.style.transform = 'translateY(40px) scale(0.92) rotateX(-10deg)';
+                phone.style.opacity = '0';
+                phone.classList.add('pointer-events-none');
+
+                main.style.transform = 'translateY(0) scale(1) rotateX(0deg)';
+                main.style.opacity = '1';
+                main.classList.remove('pointer-events-none');
+                
+                resetPhoneFlow();
+            }
+            if (navigator.vibrate) navigator.vibrate(20); 
+        }
+
+        // --- 3. HIGH END REDIRECT LOGIC ---
+        function triggerSuccessRedirect() {
+            const overlay = document.getElementById('page-transition-overlay');
+            const transitionLogo = document.getElementById('transition-logo');
+            const appContent = document.getElementById('app-content');
+            const treadBg = document.getElementById('tread-bg');
+            
+            // Blur out the main UI components
+            appContent.classList.add('content-fade-out');
+            
+            // Fade out decorative elements
+            treadBg.style.opacity = '0';
+            document.getElementById('corner-1').style.opacity = '0';
+            document.getElementById('corner-2').style.opacity = '0';
+            document.getElementById('corner-3').style.opacity = '0';
+            document.getElementById('corner-4').style.opacity = '0';
+
+            // Engage the heavy blur / black overlay
+            overlay.classList.add('engaging');
+            
+            // Bring in the syncing logo after the background has started blurring
+            setTimeout(() => {
+                transitionLogo.classList.remove('opacity-0', 'scale-50');
+                transitionLogo.classList.add('opacity-100', 'scale-100');
+            }, 300);
+
+            // Redirect smoothly to Home.html
+            setTimeout(() => {
+                window.location.href = 'Home.html';
+            }, 1800); // Wait 1.8 seconds for entire animation sequence to play out
+        }
+
+        // --- 4. Communication & Ignition Flow ---
+        let isOtpMode = false;
+
+        function handlePhoneSubmit(e) {
+            e.preventDefault();
+            const btn = document.getElementById('phone-submit-btn');
+            const keyContainer = document.getElementById('key-submit-container');
+            const phoneInputGroup = document.getElementById('phone-input-group');
+            const phoneInput = document.getElementById('phone-input');
+            const otpSection = document.getElementById('otp-section');
+            const wrapper = document.getElementById('ignition-wrapper');
+            const ignitionBtn = document.getElementById('ignition-btn');
+            const ignitionIcon = document.getElementById('ignition-icon');
+
+            if (!isOtpMode) {
+                if (phoneInput.value.length < 5) {
+                    showToast("ERR: Invalid Coordinates.", "ph-warning-circle", "text-brand-red");
+                    return;
+                }
+
+                btn.classList.add('turning');
+                if (navigator.vibrate) navigator.vibrate([20, 30]);
+                
+                setTimeout(() => {
+                    isOtpMode = true;
+                    
+                    phoneInputGroup.style.opacity = '0';
+                    phoneInputGroup.style.height = '0px';
+                    phoneInputGroup.style.overflow = 'hidden';
+                    keyContainer.style.display = 'none';
+                    
+                    otpSection.classList.remove('hidden');
+                    otpSection.classList.add('flex');
+                    
+                    ignitionBtn.disabled = false;
+                    wrapper.classList.add('glowing');
+                    ignitionIcon.classList.remove('text-brand-dark', 'opacity-50');
+                    ignitionIcon.classList.add('text-black');
+                    
+                    showToast("Code Dispatched via Commlink.", "ph-check-circle", "text-brand-orange");
+                    
+                    setTimeout(() => document.querySelector('.otp-box').focus(), 400);
+                    if (navigator.vibrate) navigator.vibrate([30, 50, 30]); 
+                }, 800);
+
+            } else {
+                const otpBoxes = document.querySelectorAll('.otp-box');
+                let code = '';
+                otpBoxes.forEach(b => code += b.value);
+
+                if (code.length < 4) {
+                    showToast("ERR: Sequence Incomplete.", "ph-warning-circle", "text-brand-red");
+                    return;
+                }
+
+                ignitionIcon.className = "ph-bold ph-spinner animate-spin text-2xl text-white z-10";
+                
+                setTimeout(() => {
+                    wrapper.classList.add('success');
+                    ignitionIcon.className = "ph-fill ph-check-circle text-3xl text-white z-10 drop-shadow-[0_0_10px_rgba(0,0,0,0.5)]";
+                    showToast("Engine Ignited. Welcome Rider.", "ph-engine", "text-green-500");
+                    if (navigator.vibrate) navigator.vibrate([100, 50, 200, 50, 300]); 
+                    
+                    // Trigger Custom High-End Redirect Animation
+                    setTimeout(() => {
+                        triggerSuccessRedirect();
+                    }, 800); // 800ms pause to let user see "Success" checkmark
+                }, 1500);
+            }
+        }
+
+        function resetPhoneFlow() {
+            isOtpMode = false;
+            const phoneInputGroup = document.getElementById('phone-input-group');
+            phoneInputGroup.style.opacity = '1';
+            phoneInputGroup.style.height = 'auto';
+            document.getElementById('phone-input').value = '';
+            
+            document.getElementById('otp-section').classList.add('hidden');
+            document.getElementById('otp-section').classList.remove('flex');
+            
+            const keyContainer = document.getElementById('key-submit-container');
+            keyContainer.style.display = 'flex';
+            
+            const btn = document.getElementById('phone-submit-btn');
+            btn.classList.remove('turning');
+            
+            const wrapper = document.getElementById('ignition-wrapper');
+            const ignitionBtn = document.getElementById('ignition-btn');
+            const ignitionIcon = document.getElementById('ignition-icon');
+            
+            ignitionBtn.disabled = true;
+            wrapper.classList.remove('glowing', 'success');
+            ignitionIcon.className = "ph-bold ph-power text-2xl text-brand-dark z-10 opacity-50";
+            
+            document.querySelectorAll('.otp-box').forEach(b => b.value = '');
+        }
+
+        // OTP Input Logic
+        const otpBoxes = document.querySelectorAll('.otp-box');
+        otpBoxes.forEach((box, index) => {
+            box.addEventListener('input', (e) => {
+                e.target.value = e.target.value.replace(/[^0-9]/g, '');
+                if (e.target.value !== '' && index < otpBoxes.length - 1) {
+                    otpBoxes[index + 1].focus();
+                }
+            });
+            box.addEventListener('keydown', (e) => {
+                if (e.key === 'Backspace' && e.target.value === '' && index > 0) {
+                    otpBoxes[index - 1].focus();
+                }
+            });
+        });
+
+        function mockAction(name, btnElement) {
+            const originalContent = btnElement.innerHTML;
+            btnElement.innerHTML = `<i class="ph-bold ph-spinner animate-spin text-xl text-brand-light"></i> <span class="font-bold text-brand-light tracking-wider font-display uppercase text-sm">Authenticating...</span>`;
+            
+            setTimeout(() => {
+                btnElement.innerHTML = originalContent;
+                showToast(`Protocol ${name} Verified.`, "ph-check-circle", "text-green-500");
+                if (navigator.vibrate) navigator.vibrate([50, 100]); 
+                
+                // Trigger Custom High-End Redirect Animation
+                setTimeout(() => {
+                    triggerSuccessRedirect();
+                }, 600);
+            }, 1500);
+        }
+
+        let toastTimeout;
+        function showToast(msg, iconClass, colorClass) {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toast-icon');
+            
+            document.getElementById('toast-msg').textContent = msg;
+            icon.className = `ph-bold ${iconClass} text-lg ${colorClass}`;
+            
+            toast.classList.add('show');
+            
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3500);
+        }
+
+        // --- 5. Background Slider ---
+        function initMotiveSlider() {
+            const sliderContainer = document.getElementById('motive-slider');
+            if (!sliderContainer) return;
+
+            const motives = [
+                { icon: 'ph-users-three', title: 'Pack Sync', desc: 'Global Rider Network Connectivity' },
+                { icon: 'ph-map-trifold', title: 'Live Telemetry', desc: 'Precision Route & Altitude Tracking' },
+                { icon: 'ph-shield-check', title: 'Encrypted Comms', desc: 'Secure Peer-to-Peer Intercom' },
+                { icon: 'ph-engine', title: 'Performance', desc: 'Real-time Vehicle Diagnostics' },
+                { icon: 'ph-warning-circle', title: 'SOS Protocol', desc: 'Automated Crash Detection & Alert' },
+                { icon: 'ph-share-network', title: 'Route Sharing', desc: 'Community Waypoints & Hazards' },
+                { icon: 'ph-garage', title: 'Asset Mgmt', desc: 'Digital Garage Inventory System' }
+            ];
+
+            motives.forEach((motive, index) => {
+                const el = document.createElement('div');
+                el.className = `slide-item w-full h-full ${index === 0 ? 'active' : ''}`;
+                
+                el.innerHTML = `
+                    <div class="w-32 h-32 rounded-3xl border border-brand-metal bg-black/60 flex items-center justify-center shrink-0 shadow-neon-intense mb-4">
+                        <i class="ph-duotone ${motive.icon} text-6xl text-brand-orange"></i>
+                    </div>
+                    <div class="flex flex-col text-center gap-2">
+                        <span class="font-display text-2xl uppercase tracking-[0.2em] font-black text-white drop-shadow-md">${motive.title}</span>
+                        <span class="font-mono text-xs text-brand-light uppercase tracking-[0.15em] px-4 max-w-[280px] leading-relaxed opacity-80">${motive.desc}</span>
+                    </div>
+                `;
+                sliderContainer.appendChild(el);
+            });
+
+            const slides = sliderContainer.querySelectorAll('.slide-item');
+            if (slides.length === 0) return;
+            
+            let currentIndex = 0;
+
+            setInterval(() => {
+                const prevIndex = currentIndex;
+                currentIndex = (currentIndex + 1) % slides.length;
+                
+                slides[prevIndex].classList.remove('active');
+                slides[prevIndex].classList.add('exit');
+                
+                slides[currentIndex].classList.remove('exit');
+                void slides[currentIndex].offsetWidth; 
+                slides[currentIndex].classList.add('active');
+            }, 3000);
+        }
     </script>
 </body>
 </html>
