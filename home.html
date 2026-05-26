@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>RideSync - Live Telemetry & Navigation</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Orbitron:wght@400;500;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet CSS for OpenStreetMap -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                        display: ['Orbitron', 'sans-serif'],
+                        mono: ['Space Mono', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            orange: '#FF3D00', 
+                            red: '#D32F2F',
+                            dark: '#050505',   
+                            gray: '#141414',   
+                            metal: '#2A2B2E',  
+                            light: '#A0A0A0'   
+                        }
+                    },
+                    boxShadow: {
+                        'neon': '0 0 15px rgba(255, 61, 0, 0.4)',
+                        'neon-red': '0 0 25px rgba(211, 47, 47, 0.8)',
+                        'capsule': '0 10px 30px rgba(0,0,0,0.8), inset 0 1px 1px rgba(255,255,255,0.1)'
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body {
+            background-color: #000;
+            background-image: radial-gradient(circle at 50% 50%, #111 0%, #000 100%);
+            color: #fff;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            overflow: hidden; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        /* Desktop Presentation Frame */
+        .device-frame {
+            position: relative;
+            width: 100%;
+            height: 100dvh;
+            max-width: 440px;
+            max-height: 950px;
+            background: #050505;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 50px rgba(255, 61, 0, 0.05), 0 0 100px rgba(0, 0, 0, 1);
+        }
+        @media (min-width: 480px) {
+            .device-frame {
+                height: 90dvh;
+                border-radius: 40px;
+                border: 8px solid #1a1a1a;
+                border-top-width: 12px;
+                border-bottom-width: 12px;
+            }
+            .device-frame::after {
+                content: '';
+                position: absolute;
+                top: 0; left: 50%; transform: translateX(-50%);
+                width: 120px; height: 25px;
+                background: #000;
+                border-bottom-left-radius: 15px;
+                border-bottom-right-radius: 15px;
+                z-index: 9999;
+            }
+        }
+
+        /* Background Textures */
+        .tread-pattern {
+            position: absolute;
+            inset: 0;
+            opacity: 0.15;
+            background: repeating-linear-gradient(45deg, #020202, #020202 10px, #0a0a0a 10px, #0a0a0a 20px);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* View Management */
+        .view-panel {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+            transform: scale(0.98);
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            padding-top: 70px; /* Space for top header */
+            padding-bottom: 100px; /* Space for nav bar */
+        }
+        .view-panel.active {
+            opacity: 1;
+            pointer-events: auto;
+            transform: scale(1);
+            z-index: 20;
+        }
+
+        /* Map specific overrides */
+        #view-map { padding: 0; padding-bottom: 0; }
+        .leaflet-container { background: #050505 !important; font-family: 'Space Mono', monospace; }
+        .leaflet-control-zoom { border: 1px solid rgba(255,255,255,0.1) !important; background: rgba(20,20,20,0.8) !important; backdrop-filter: blur(5px); border-radius: 8px !important; overflow: hidden; margin-top: 80px !important;}
+        .leaflet-control-zoom a { background: transparent !important; color: #FF3D00 !important; border-bottom: 1px solid rgba(255,255,255,0.1) !important; }
+        .leaflet-control-zoom a:hover { background: rgba(255,61,0,0.2) !important; }
+        .leaflet-control-attribution { display: none; } 
+
+        /* Custom Map Marker Ping */
+        .ping-ring {
+            position: absolute;
+            width: 40px; height: 40px;
+            background: rgba(255, 61, 0, 0.4);
+            border-radius: 50%;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            animation: ping-anim 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+            z-index: -1;
+        }
+        @keyframes ping-anim {
+            75%, 100% { transform: translate(-50%, -50%) scale(2.5); opacity: 0; }
+        }
+
+        /* Glass Nav Capsule */
+        .glass-capsule {
+            background: rgba(15, 15, 15, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.1);
+        }
+
+        .nav-item {
+            color: #777;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        .nav-item.active { color: #FF3D00; }
+        .nav-item.active::after {
+            content: ''; position: absolute;
+            bottom: -6px; left: 50%; transform: translateX(-50%);
+            width: 4px; height: 4px; border-radius: 50%;
+            background: #FF3D00; box-shadow: 0 0 8px #FF3D00;
+        }
+        .nav-item:active { transform: scale(0.9); }
+
+        /* SOS Button */
+        .sos-btn {
+            background: linear-gradient(145deg, #b91c1c, #7f1d1d);
+            border: 2px solid #ef4444;
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.4), inset 0 2px 5px rgba(255,255,255,0.3);
+            transition: all 0.2s ease;
+        }
+        .sos-btn:active {
+            transform: translateY(2px) scale(0.95);
+            box-shadow: 0 0 5px rgba(239, 68, 68, 0.4), inset 0 4px 8px rgba(0,0,0,0.6);
+        }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+
+        /* SOS Overlay */
+        #sos-overlay {
+            background: rgba(10, 0, 0, 0.95);
+            backdrop-filter: blur(10px);
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.3s ease;
+            z-index: 9999;
+        }
+        #sos-overlay.active { opacity: 1; pointer-events: auto; }
+        
+        .sos-pulse-bg {
+            position: absolute; inset: 0;
+            background: radial-gradient(circle at 50% 50%, rgba(211, 47, 47, 0.2) 0%, transparent 70%);
+            animation: emergency-pulse 1s infinite alternate;
+        }
+        @keyframes emergency-pulse {
+            0% { opacity: 0.5; transform: scale(0.95); }
+            100% { opacity: 1; transform: scale(1.05); }
+        }
+
+        .hud-scanline {
+            position: absolute; top: 0; left: 0; width: 100%; height: 2px;
+            background: rgba(255, 61, 0, 0.5);
+            box-shadow: 0 0 10px #FF3D00;
+            animation: scanline 3s linear infinite;
+            z-index: 50; opacity: 0.5; pointer-events: none;
+        }
+        @keyframes scanline {
+            0% { top: 0%; }
+            100% { top: 100%; }
+        }
+
+        /* NEW Additions for Heading & Trails */
+        .bike-rotation-wrapper {
+            transition: transform 0.5s ease-out;
+            width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        /* Connecting overlay */
+        #connecting-overlay {
+            position: absolute; inset: 0; z-index: 99999;
+            background: #050505; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            transition: opacity 0.5s ease;
+        }
+    </style>
+</head>
+<body>
+
+    <main class="device-frame dashboard-bg relative">
+        <div class="tread-pattern"></div>
+        <div class="hud-scanline"></div>
+
+        <!-- Initializing Screen -->
+        <div id="connecting-overlay">
+            <i class="ph-bold ph-spinner animate-spin text-4xl text-brand-orange mb-4"></i>
+            <span class="font-mono text-xs text-brand-light tracking-widest uppercase">Initializing Uplink...</span>
+        </div>
+
+        <!-- Top Header HUD -->
+        <header class="absolute top-0 w-full z-50 pt-10 pb-4 px-6 flex justify-between items-end bg-gradient-to-b from-[#050505] via-[#050505]/80 to-transparent pointer-events-none">
+            <div class="flex flex-col">
+                <span class="text-[9px] font-mono text-brand-orange uppercase tracking-[0.3em] mb-1 flex items-center gap-1">
+                    <span id="gps-indicator" class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span> <span id="gps-status-text">Acquiring GPS</span>
+                </span>
+                <h1 class="font-display text-2xl font-black tracking-widest uppercase italic text-white drop-shadow-[0_0_10px_rgba(255,61,0,0.3)] leading-none pointer-events-auto">
+                    Ride<span class="text-brand-orange">Sync</span>
+                </h1>
+            </div>
+            
+            <div class="flex flex-col items-end text-right pointer-events-auto">
+                <span id="header-speed" class="font-mono text-xl font-bold text-white tracking-wider">0<span class="text-[10px] text-brand-light ml-1">KPH</span></span>
+                <span id="header-alt" class="font-mono text-[10px] text-brand-light tracking-widest mt-0.5"><i class="ph-bold ph-arrow-up-right text-brand-orange"></i> <span id="alt-val">--</span> ALT</span>
+                <span id="header-weather" class="font-mono text-[10px] text-blue-400 tracking-widest mt-1 hidden"><i class="ph-fill ph-thermometer text-blue-500"></i> <span id="weather-val">--</span>°C</span>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <div id="content-area" class="flex-grow relative overflow-hidden w-full h-full">
+            
+            <!-- VIEW: MAP -->
+            <div id="view-map" class="view-panel active">
+                <div id="map" class="w-full h-full z-10"></div>
+                
+                <div class="absolute top-28 left-4 z-20 glass-capsule rounded-xl p-2 flex flex-col gap-2">
+                    <button class="w-8 h-8 rounded bg-brand-dark border border-brand-metal flex items-center justify-center text-brand-light hover:text-white hover:border-brand-orange transition-colors" onclick="recenterMap()">
+                        <i class="ph-bold ph-crosshair text-lg"></i>
+                    </button>
+                </div>
+
+                <div class="absolute top-28 right-4 z-20 glass-capsule px-3 py-1.5 rounded-lg flex items-center gap-2 border border-brand-orange/30">
+                    <i class="ph-fill ph-users-three text-brand-orange text-sm"></i>
+                    <span class="font-mono text-[10px] font-bold tracking-widest uppercase" id="pack-count-display">SOLO RIDER</span>
+                </div>
+            </div>
+
+            <!-- VIEW: GROUPS/PACK -->
+            <div id="view-groups" class="view-panel px-5 overflow-y-auto">
+                
+                <!-- If not in a group -->
+                <div id="group-setup-ui" class="space-y-6 mt-4">
+                    <div class="text-center mb-6">
+                        <i class="ph-duotone ph-share-network text-5xl text-brand-orange mb-2"></i>
+                        <h2 class="font-display text-xl font-bold tracking-widest uppercase">Form a Pack</h2>
+                        <p class="font-mono text-xs text-brand-light mt-2">Connect to a live telemetry mesh network to track riders in real-time.</p>
+                    </div>
+
+                    <div class="bg-brand-gray border border-brand-metal rounded-xl p-5">
+                        <h3 class="font-display text-sm font-bold tracking-widest uppercase text-brand-light mb-3">Join Existing</h3>
+                        <div class="flex gap-2">
+                            <input type="text" id="join-group-id" placeholder="ENTER 6-DIGIT ID" class="flex-grow bg-brand-dark border border-brand-metal rounded-lg px-4 py-3 font-mono text-center tracking-[0.2em] uppercase focus:outline-none focus:border-brand-orange transition-colors">
+                            <button onclick="handleJoinGroup()" class="bg-brand-orange text-white px-5 rounded-lg font-display font-bold tracking-wider active:scale-95 transition-transform">JOIN</button>
+                        </div>
+                    </div>
+
+                    <div class="relative flex items-center py-2">
+                        <div class="flex-grow border-t border-brand-metal"></div>
+                        <span class="flex-shrink-0 mx-4 font-mono text-xs text-brand-light">OR</span>
+                        <div class="flex-grow border-t border-brand-metal"></div>
+                    </div>
+
+                    <button onclick="handleCreateGroup()" class="w-full bg-transparent border-2 border-brand-orange text-brand-orange py-4 rounded-xl font-display font-bold tracking-widest uppercase hover:bg-brand-orange/10 active:scale-95 transition-all flex items-center justify-center gap-2">
+                        <i class="ph-bold ph-plus-circle text-lg"></i> Create New Pack
+                    </button>
+                </div>
+
+                <!-- If in a group -->
+                <div id="group-active-ui" class="hidden flex-col h-full">
+                    <div class="flex items-center justify-between mb-4 bg-brand-gray border border-brand-orange/50 rounded-xl p-4 shadow-neon">
+                        <div>
+                            <span class="font-mono text-[10px] text-brand-light tracking-widest block mb-1">SECURE CHANNEL LINKED</span>
+                            <h2 class="font-display text-2xl font-bold tracking-widest uppercase text-white" id="current-group-id-display">------</h2>
+                        </div>
+                        <button onclick="handleLeaveGroup()" class="w-10 h-10 rounded-full bg-brand-red/20 border border-brand-red text-brand-red flex items-center justify-center hover:bg-brand-red hover:text-white transition-colors">
+                            <i class="ph-bold ph-sign-out"></i>
+                        </button>
+                    </div>
+                    
+                    <h3 class="font-display text-sm font-bold tracking-widest uppercase text-brand-light mb-4 pl-1 border-l-2 border-brand-orange">Active Riders</h3>
+                    
+                    <div id="riders-list" class="space-y-3 pb-24">
+                        <!-- Dynamic riders injected here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: MESSAGES/COMMS -->
+            <div id="view-messages" class="view-panel px-5 overflow-hidden flex flex-col">
+                <div class="flex items-center justify-between mb-4 shrink-0">
+                    <h2 class="font-display text-lg font-bold tracking-widest uppercase border-l-2 border-brand-orange pl-3">Comms Link</h2>
+                    <i class="ph-bold ph-faders text-brand-light text-xl"></i>
+                </div>
+                
+                <div id="chat-container" class="flex-grow overflow-y-auto space-y-3 pb-4 pr-1 scroll-smooth">
+                    <div class="bg-brand-gray border border-brand-metal rounded-xl p-3 flex items-center gap-3 opacity-50">
+                        <div class="w-10 h-10 rounded-full bg-brand-dark flex items-center justify-center shrink-0">
+                            <i class="ph-bold ph-microphone-slash text-brand-light"></i>
+                        </div>
+                        <div class="flex-grow">
+                            <p class="text-xs text-brand-light font-mono">Join a pack to enable secure communications.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="shrink-0 pb-24 pt-2">
+                    <form id="chat-form" onsubmit="handleSendChat(event)" class="flex gap-2 hidden">
+                        <input type="text" id="chat-input" placeholder="Transmit message..." class="flex-grow bg-brand-dark border border-brand-metal rounded-lg px-4 py-3 font-mono text-xs focus:outline-none focus:border-brand-orange transition-colors" autocomplete="off">
+                        <button type="submit" class="bg-brand-orange text-white w-12 rounded-lg flex items-center justify-center hover:bg-[#d83500] active:scale-95 transition-transform">
+                            <i class="ph-bold ph-paper-plane-right"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- VIEW: PROFILE/TELEMETRY -->
+            <div id="view-profile" class="view-panel px-5 overflow-y-auto">
+                <div class="flex flex-col items-center mt-2 mb-8">
+                    <div class="relative mb-4">
+                        <div class="w-24 h-24 rounded-full border-4 border-[#141414] shadow-neon overflow-hidden bg-brand-metal relative z-10">
+                            <img id="profile-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=SyncUser&backgroundColor=2A2B2E" class="w-full h-full object-cover">
+                        </div>
+                        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-28 h-28 border border-brand-orange/30 rounded-full z-0 rotate-45 pointer-events-none border-dashed animate-[spin_10s_linear_infinite]"></div>
+                    </div>
+                    <h2 id="profile-name" class="font-display text-xl font-bold tracking-widest uppercase">Rider_Zero</h2>
+                    <span class="font-mono text-xs text-brand-orange tracking-[0.2em] mt-1">OPERATIVE</span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 mb-6">
+                    <div class="bg-brand-gray border border-brand-metal p-4 rounded-xl flex flex-col items-center justify-center">
+                        <i class="ph-duotone ph-map-pin text-brand-light text-2xl mb-2"></i>
+                        <span class="font-mono text-[10px] text-brand-light tracking-widest mb-1">LAT</span>
+                        <span id="stat-lat" class="font-mono font-bold text-sm">--.----</span>
+                    </div>
+                    <div class="bg-brand-gray border border-brand-metal p-4 rounded-xl flex flex-col items-center justify-center">
+                        <i class="ph-duotone ph-map-pin text-brand-light text-2xl mb-2"></i>
+                        <span class="font-mono text-[10px] text-brand-light tracking-widest mb-1">LNG</span>
+                        <span id="stat-lng" class="font-mono font-bold text-sm">--.----</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- FLOATING NAVIGATION CAPSULE -->
+        <div class="absolute bottom-6 left-1/2 -translate-x-1/2 w-[92%] z-50">
+            <nav class="glass-capsule rounded-full py-2 px-4 flex items-center justify-between shadow-2xl">
+                
+                <button class="nav-item active flex flex-col items-center justify-center w-12 h-12 rounded-full" onclick="switchTab('view-map', this)">
+                    <i class="ph-bold ph-map-trifold text-2xl"></i>
+                </button>
+                
+                <button class="nav-item flex flex-col items-center justify-center w-12 h-12 rounded-full relative" onclick="switchTab('view-groups', this)">
+                    <i class="ph-bold ph-users-three text-2xl"></i>
+                    <div id="nav-pack-indicator" class="absolute top-1 right-2 w-2 h-2 rounded-full bg-brand-orange shadow-[0_0_5px_#FF3D00] hidden"></div>
+                </button>
+
+                <!-- Central SOS Trigger -->
+                <div class="relative -top-5 mx-2">
+                    <div class="absolute inset-0 bg-brand-red rounded-full opacity-20 blur-md"></div>
+                    <button class="sos-btn w-16 h-16 rounded-full flex flex-col items-center justify-center relative z-10" onclick="triggerSOS()">
+                        <i class="ph-fill ph-warning text-white text-3xl mb-0.5"></i>
+                        <span class="text-[8px] font-display font-black text-white tracking-widest uppercase">SOS</span>
+                    </button>
+                </div>
+
+                <button class="nav-item flex flex-col items-center justify-center w-12 h-12 rounded-full" onclick="switchTab('view-messages', this)">
+                    <i class="ph-bold ph-chat-teardrop-text text-2xl"></i>
+                </button>
+                
+                <button class="nav-item flex flex-col items-center justify-center w-12 h-12 rounded-full" onclick="switchTab('view-profile', this)">
+                    <i class="ph-bold ph-user-circle-gear text-2xl"></i>
+                </button>
+
+            </nav>
+        </div>
+
+        <!-- INCOMING GLOBAL SOS BANNER -->
+        <div id="incoming-sos-banner" class="absolute top-24 left-1/2 -translate-x-1/2 w-[90%] bg-[#450a0a] border-2 border-brand-red rounded-xl p-4 shadow-neon-red z-[9999] hidden flex-col items-center text-center animate-bounce">
+            <i class="ph-fill ph-warning-octagon text-4xl text-white mb-2 animate-pulse"></i>
+            <h3 class="font-display font-black text-white uppercase tracking-widest mb-1 text-lg">DISTRESS BEACON</h3>
+            <span id="incoming-sos-name" class="font-mono text-xs text-white mb-3">A Rider has triggered SOS</span>
+            <button onclick="document.getElementById('incoming-sos-banner').classList.replace('flex', 'hidden')" class="bg-black/50 border border-brand-red text-white px-6 py-2 rounded-full font-bold text-xs uppercase tracking-wider">Acknowledge</button>
+        </div>
+
+        <!-- SOS EMERGENCY OVERLAY MODAL -->
+        <div id="sos-overlay" class="absolute inset-0 flex flex-col items-center justify-center px-6">
+            <div class="sos-pulse-bg"></div>
+            
+            <div class="z-10 flex flex-col items-center text-center max-w-[300px]">
+                <i class="ph-fill ph-warning-octagon text-7xl text-brand-red mb-4 drop-shadow-neon-red animate-pulse"></i>
+                <h2 class="font-display text-3xl font-black text-white tracking-widest uppercase mb-2">Emergency</h2>
+                <p class="font-mono text-sm text-brand-light mb-8 opacity-90">Transmitting distress beacon with exact coordinates to Pack and EMS.</p>
+                
+                <div class="text-7xl font-mono font-bold text-white mb-8 tracking-tighter" id="sos-timer">10</div>
+
+                <button class="w-full bg-brand-dark border border-brand-metal py-4 rounded-full font-display font-bold tracking-widest text-brand-light uppercase shadow-capsule active:bg-[#1a1a1a] transition" onclick="cancelSOS()">
+                    Abort Protocol
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot, collection, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global State
+        let userId = null;
+        let displayName = "Rider_" + Math.floor(Math.random() * 1000);
+        let currentGroupId = null;
+        let unsubscribeRiders = null;
+        let unsubscribeChat = null;
+        let map = null;
+        let myMarker = null;
+        let packMarkers = {}; // Stores leaflet markers for other riders
+        let routePolyline = null;
+        let routeCoordinates = [];
+        let hasFetchedWeather = false;
+        
+        let myData = {
+            lat: 12.9716, // Default to Bengaluru initially
+            lng: 77.5946,
+            speed: 0,
+            alt: 0,
+            heading: 0,
+            status: 'NOMINAL',
+            updatedAt: Date.now()
+        };
+        let locationLocked = false;
+
+        // Firebase Setup
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'demo-ridesync-1';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // UI Helpers
+        window.switchTab = (targetId, btnElement) => {
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            if(btnElement) btnElement.classList.add('active');
+
+            document.querySelectorAll('.view-panel').forEach(el => el.classList.remove('active'));
+            document.getElementById(targetId).classList.add('active');
+
+            if (targetId === 'view-map' && map) {
+                setTimeout(() => map.invalidateSize(), 100);
+            }
+            if (navigator.vibrate) navigator.vibrate(20);
+        };
+
+        window.recenterMap = () => {
+            if(map && locationLocked) {
+                map.setView([myData.lat, myData.lng], 16, { animate: true, duration: 1 });
+                if (navigator.vibrate) navigator.vibrate(30);
+            }
+        };
+
+        function generateAvatarUrl(seed) {
+            return `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}&backgroundColor=2A2B2E`;
+        }
+
+        async function initApp() {
+            try {
+                // Auth - added strict check for empty tokens
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                
+                if(!auth.currentUser) throw new Error("Auth failed");
+                userId = auth.currentUser.uid;
+                
+                // Set Profile Data
+                document.getElementById('profile-name').innerText = displayName;
+                document.getElementById('profile-avatar').src = generateAvatarUrl(userId);
+
+            } catch (err) {
+                console.warn("Firebase Auth Error (Running in Local Mode):", err);
+                document.getElementById('gps-status-text').innerText = "Offline Mode";
+            } finally {
+                // Always execute map and GPS init, even if auth fails
+                try {
+                    initLeafletMap();
+                    startTracking();
+                } catch(e) {
+                    console.error("Map/GPS Error:", e);
+                }
+
+                // Remove loading overlay safely
+                const overlay = document.getElementById('connecting-overlay');
+                if (overlay) {
+                    overlay.style.opacity = '0';
+                    setTimeout(() => overlay.remove(), 500);
+                }
+            }
+        }
+
+        function initLeafletMap() {
+            map = L.map('map', { zoomControl: false, attributionControl: false }).setView([myData.lat, myData.lng], 14);
+            L.control.zoom({ position: 'topright' }).addTo(map);
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                maxZoom: 19, attribution: ''
+            }).addTo(map);
+
+            // Add Trail Polyline
+            routePolyline = L.polyline([], {color: '#FF3D00', weight: 4, opacity: 0.6, className: 'drop-shadow-[0_0_5px_#FF3D00]'}).addTo(map);
+
+            // My Custom Marker
+            const myBikeIcon = L.divIcon({
+                className: 'custom-user-marker',
+                html: `
+                    <div class="relative">
+                        <div class="ping-ring"></div>
+                        <div class="bike-rotation-wrapper">
+                            <div class="w-10 h-10 bg-[#050505] rounded-full border-2 border-brand-orange flex items-center justify-center shadow-neon z-10 relative">
+                                <i class="ph-fill ph-navigation-arrow text-brand-orange text-xl transform -rotate-45"></i>
+                            </div>
+                        </div>
+                    </div>
+                `, iconSize: [40, 40], iconAnchor: [20, 20]
+            });
+
+            myMarker = L.marker([myData.lat, myData.lng], {icon: myBikeIcon}).addTo(map);
+        }
+
+        async function fetchWeather(lat, lng) {
+            try {
+                const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current_weather=true`);
+                const data = await res.json();
+                document.getElementById('weather-val').innerText = Math.round(data.current_weather.temperature);
+                document.getElementById('header-weather').classList.remove('hidden');
+                hasFetchedWeather = true;
+            } catch(e) { console.warn("Weather fetch failed"); }
+        }
+
+        function startTracking() {
+            if (!navigator.geolocation) {
+                document.getElementById('gps-status-text').innerText = "GPS Not Supported";
+                return;
+            }
+
+            navigator.geolocation.watchPosition(
+                (position) => {
+                    const { latitude, longitude, speed, altitude, heading } = position.coords;
+                    
+                    myData.lat = latitude;
+                    myData.lng = longitude;
+                    
+                    // Speed is in m/s, convert to kph. Handle null.
+                    myData.speed = speed ? Math.round(speed * 3.6) : 0;
+                    myData.alt = altitude ? Math.round(altitude) : 0;
+                    myData.heading = heading || myData.heading; // Keep old heading if stationary
+                    myData.updatedAt = Date.now();
+
+                    // Update Map Trail
+                    routeCoordinates.push([myData.lat, myData.lng]);
+                    if (routePolyline) routePolyline.setLatLngs(routeCoordinates);
+
+                    // Fetch weather once locked
+                    if(!hasFetchedWeather) fetchWeather(myData.lat, myData.lng);
+
+                    // Update UI Header
+                    document.getElementById('header-speed').innerHTML = `${myData.speed}<span class="text-[10px] text-brand-light ml-1">KPH</span>`;
+                    document.getElementById('alt-val').innerText = `${myData.alt}M`;
+                    
+                    // Update Profile Stats
+                    document.getElementById('stat-lat').innerText = myData.lat.toFixed(4);
+                    document.getElementById('stat-lng').innerText = myData.lng.toFixed(4);
+
+                    // Update Map Marker & Heading
+                    if (myMarker) {
+                        myMarker.setLatLng([myData.lat, myData.lng]);
+                        const wrapper = myMarker.getElement()?.querySelector('.bike-rotation-wrapper');
+                        if (wrapper && myData.heading) wrapper.style.transform = `rotate(${myData.heading}deg)`;
+                    }
+
+                    // First lock pan
+                    if (!locationLocked) {
+                        locationLocked = true;
+                        document.getElementById('gps-indicator').classList.replace('bg-red-500', 'bg-green-500');
+                        document.getElementById('gps-status-text').innerText = "Uplink Secure";
+                        map.setView([myData.lat, myData.lng], 16);
+                    }
+
+                    // Push to Firestore if in a group
+                    pushStatusToFirestore();
+                },
+                (error) => {
+                    console.error("GPS Error", error);
+                    document.getElementById('gps-status-text').innerText = "GPS Signal Lost";
+                    document.getElementById('gps-indicator').classList.replace('bg-green-500', 'bg-red-500');
+                },
+                { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
+            );
+        }
+
+        async function pushStatusToFirestore() {
+            if (!userId || !currentGroupId) return;
+            
+            try {
+                // Rule 1: Use specific public path
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'riders', userId);
+                await setDoc(docRef, {
+                    groupId: currentGroupId,
+                    displayName: displayName,
+                    avatar: generateAvatarUrl(userId),
+                    lat: myData.lat,
+                    lng: myData.lng,
+                    speed: myData.speed,
+                    alt: myData.alt,
+                    heading: myData.heading,
+                    status: myData.status,
+                    updatedAt: myData.updatedAt
+                });
+            } catch (err) {
+                console.error("Error pushing status:", err);
+            }
+        }
+
+        function listenToPack() {
+            if (!userId || !currentGroupId) return;
+
+            const ridersRef = collection(db, 'artifacts', appId, 'public', 'data', 'riders');
+            
+            // Rule 2: No complex queries, fetch all and filter in JS memory
+            unsubscribeRiders = onSnapshot(ridersRef, (snapshot) => {
+                const now = Date.now();
+                const packMembers = [];
+
+                snapshot.forEach(docSnap => {
+                    const data = docSnap.data();
+                    
+                    // Filter memory
+                    if (data.groupId === currentGroupId && docSnap.id !== userId) {
+                        // Ignore stale data (older than 3 minutes)
+                        if (now - data.updatedAt < 3 * 60 * 1000) {
+                            packMembers.push({ id: docSnap.id, ...data });
+                        }
+                    }
+                });
+
+                updatePackUI(packMembers);
+                updatePackMarkers(packMembers);
+            }, (error) => {
+                console.error("Pack listener error:", error);
+            });
+        }
+
+        function updatePackMarkers(members) {
+            const activeIds = new Set(members.map(m => m.id));
+            
+            // Remove disconnected riders from map
+            Object.keys(packMarkers).forEach(id => {
+                if (!activeIds.has(id)) {
+                    map.removeLayer(packMarkers[id]);
+                    delete packMarkers[id];
+                }
+            });
+
+            // Update or add riders
+            const packBikeIcon = L.divIcon({
+                className: 'custom-pack-marker',
+                html: `
+                    <div class="bike-rotation-wrapper">
+                        <div class="w-8 h-8 bg-brand-metal rounded-full border-2 border-brand-orange flex items-center justify-center shadow-md opacity-90">
+                            <i class="ph-fill ph-navigation-arrow text-white text-sm transform -rotate-45"></i>
+                        </div>
+                    </div>
+                `, iconSize: [32, 32], iconAnchor: [16, 16]
+            });
+
+            let sosTriggeredBy = null;
+
+            members.forEach(member => {
+                if (packMarkers[member.id]) {
+                    packMarkers[member.id].setLatLng([member.lat, member.lng]);
+                    const wrapper = packMarkers[member.id].getElement()?.querySelector('.bike-rotation-wrapper');
+                    if (wrapper && member.heading) wrapper.style.transform = `rotate(${member.heading}deg)`;
+                } else {
+                    packMarkers[member.id] = L.marker([member.lat, member.lng], {icon: packBikeIcon}).addTo(map);
+                }
+                
+                // Check SOS Status
+                if (member.status === 'SOS') sosTriggeredBy = member.displayName;
+            });
+
+            // Handle Incoming Global SOS
+            const sosBanner = document.getElementById('incoming-sos-banner');
+            if (sosTriggeredBy) {
+                document.getElementById('incoming-sos-name').innerText = `${sosTriggeredBy} HAS TRIGGERED AN SOS`;
+                sosBanner.classList.replace('hidden', 'flex');
+                if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300]);
+            } else {
+                sosBanner.classList.replace('flex', 'hidden');
+            }
+
+            // Update Header count
+            document.getElementById('pack-count-display').innerText = `PACK: ${members.length + 1} ONLINE`;
+            
+            // Update Nav Indicator
+            const indicator = document.getElementById('nav-pack-indicator');
+            if (members.length > 0) indicator.classList.remove('hidden');
+            else indicator.classList.add('hidden');
+        }
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            // Haversine formula for rough distance display
+            const R = 6371; // km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return (R * c).toFixed(1);
+        }
+
+        function updatePackUI(members) {
+            const listEl = document.getElementById('riders-list');
+            listEl.innerHTML = ''; // Clear
+
+            if (members.length === 0) {
+                listEl.innerHTML = `
+                    <div class="bg-brand-dark border border-brand-metal/50 rounded-xl p-4 text-center">
+                        <span class="font-mono text-xs text-brand-light">AWAITING RIDERS TO JOIN PACK...</span>
+                    </div>
+                `;
+                return;
+            }
+
+            members.forEach(member => {
+                const distanceStr = calculateDistance(myData.lat, myData.lng, member.lat, member.lng);
+                
+                const html = `
+                    <div class="bg-brand-gray border border-brand-metal rounded-xl p-4 flex items-center gap-4 relative overflow-hidden">
+                        <div class="absolute right-0 top-0 w-1 h-full bg-green-500"></div>
+                        <div class="relative shrink-0">
+                            <img src="${member.avatar}" class="w-12 h-12 rounded-full border-2 border-brand-metal">
+                            <div class="absolute -bottom-1 -right-1 w-4 h-4 bg-[#050505] rounded-full flex items-center justify-center">
+                                <div class="w-2.5 h-2.5 bg-green-500 rounded-full"></div>
+                            </div>
+                        </div>
+                        <div class="flex-grow overflow-hidden">
+                            <h3 class="font-display font-bold text-sm tracking-wide truncate">${member.displayName}</h3>
+                            <div class="flex gap-3 text-[10px] font-mono text-brand-light mt-1">
+                                <span class="flex items-center gap-1"><i class="ph-bold ph-navigation-arrow text-brand-orange"></i> ${distanceStr} KM</span>
+                                <span class="flex items-center gap-1"><i class="ph-bold ph-speedometer"></i> ${member.speed} KPH</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                listEl.insertAdjacentHTML('beforeend', html);
+            });
+        }
+
+        window.handleCreateGroup = () => {
+            // Generate random 6 char hex ID
+            const newId = Math.random().toString(16).substr(2, 6).toUpperCase();
+            activateGroup(newId);
+        };
+
+        window.handleJoinGroup = () => {
+            const input = document.getElementById('join-group-id');
+            const val = input.value.trim().toUpperCase();
+            if (val.length < 3) {
+                alert("Please enter a valid Group ID");
+                return;
+            }
+            activateGroup(val);
+            input.value = '';
+        };
+
+        function activateGroup(groupId) {
+            currentGroupId = groupId;
+            document.getElementById('group-setup-ui').classList.add('hidden');
+            document.getElementById('group-active-ui').classList.remove('hidden');
+            document.getElementById('group-active-ui').classList.add('flex');
+            document.getElementById('current-group-id-display').innerText = currentGroupId;
+            
+            // Enable Chat UI
+            document.getElementById('chat-form').classList.remove('hidden');
+            
+            pushStatusToFirestore();
+            listenToPack();
+            listenToChat();
+        }
+
+        window.handleLeaveGroup = async () => {
+            if (unsubscribeRiders) { unsubscribeRiders(); unsubscribeRiders = null; }
+            if (unsubscribeChat) { unsubscribeChat(); unsubscribeChat = null; }
+            
+            // Clean up my doc from Firestore
+            if (userId) {
+                try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'riders', userId)); } catch(e) {}
+            }
+
+            currentGroupId = null;
+            
+            document.getElementById('group-setup-ui').classList.remove('hidden');
+            document.getElementById('group-active-ui').classList.add('hidden');
+            document.getElementById('group-active-ui').classList.remove('flex');
+            
+            // Disable Chat UI
+            document.getElementById('chat-form').classList.add('hidden');
+            document.getElementById('chat-container').innerHTML = `
+                <div class="bg-brand-gray border border-brand-metal rounded-xl p-3 flex items-center gap-3 opacity-50">
+                    <div class="w-10 h-10 rounded-full bg-brand-dark flex items-center justify-center shrink-0">
+                        <i class="ph-bold ph-microphone-slash text-brand-light"></i>
+                    </div>
+                    <div class="flex-grow">
+                        <p class="text-xs text-brand-light font-mono">Join a pack to enable secure communications.</p>
+                    </div>
+                </div>`;
+            
+            // Clear UI state
+            document.getElementById('pack-count-display').innerText = `SOLO RIDER`;
+            document.getElementById('nav-pack-indicator').classList.add('hidden');
+            updatePackMarkers([]); // clear map
+        };
+        
+        // --- CHAT LOGIC ---
+        window.handleSendChat = async (e) => {
+            e.preventDefault();
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
+            if(!text || !currentGroupId || !userId) return;
+            
+            input.value = '';
+            try {
+                const msgRef = collection(db, 'artifacts', appId, 'public', 'data', 'messages');
+                await setDoc(doc(msgRef), {
+                    groupId: currentGroupId,
+                    senderId: userId,
+                    senderName: displayName,
+                    avatar: generateAvatarUrl(userId),
+                    text: text,
+                    timestamp: Date.now()
+                });
+            } catch(e) { console.error("Chat error", e); }
+        };
+
+        function listenToChat() {
+            if (!currentGroupId) return;
+            const msgRef = collection(db, 'artifacts', appId, 'public', 'data', 'messages');
+            
+            unsubscribeChat = onSnapshot(msgRef, (snapshot) => {
+                let msgs = [];
+                snapshot.forEach(docSnap => {
+                    const data = docSnap.data();
+                    if(data.groupId === currentGroupId) msgs.push(data);
+                });
+                
+                // Sort by timestamp
+                msgs.sort((a,b) => a.timestamp - b.timestamp);
+                
+                const container = document.getElementById('chat-container');
+                container.innerHTML = '';
+                
+                if (msgs.length === 0) {
+                    container.innerHTML = `<div class="text-center p-4 opacity-50"><span class="font-mono text-xs">CHANNEL OPEN. WAITING FOR COMMS...</span></div>`;
+                } else {
+                    msgs.forEach(msg => {
+                        const isMe = msg.senderId === userId;
+                        const timeStr = new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        
+                        let html = '';
+                        if (isMe) {
+                            html = `
+                            <div class="flex items-end justify-end gap-2 pl-8">
+                                <div class="bg-brand-orange/20 border border-brand-orange text-white rounded-t-xl rounded-l-xl p-3 shadow-neon text-sm font-mono">${msg.text}</div>
+                            </div>`;
+                        } else {
+                            html = `
+                            <div class="flex items-end gap-2 pr-8">
+                                <img src="${msg.avatar}" class="w-8 h-8 rounded-full border border-brand-metal shrink-0">
+                                <div>
+                                    <span class="text-[9px] font-mono text-brand-light ml-1 block mb-0.5">${msg.senderName} • ${timeStr}</span>
+                                    <div class="bg-brand-gray border border-brand-metal text-brand-light rounded-t-xl rounded-r-xl p-3 text-sm font-mono">${msg.text}</div>
+                                </div>
+                            </div>`;
+                        }
+                        container.insertAdjacentHTML('beforeend', html);
+                    });
+                }
+                // Auto-scroll to bottom
+                container.scrollTop = container.scrollHeight;
+            });
+        }
+
+        let sosInterval;
+        let countdown = 10;
+        
+        window.triggerSOS = () => {
+            const overlay = document.getElementById('sos-overlay');
+            const timerEl = document.getElementById('sos-timer');
+            
+            if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+            
+            countdown = 10;
+            timerEl.innerText = countdown;
+            overlay.classList.add('active');
+            
+            clearInterval(sosInterval);
+            sosInterval = setInterval(() => {
+                countdown--;
+                timerEl.innerText = countdown;
+                if (navigator.vibrate) navigator.vibrate(50);
+                
+                if (countdown <= 0) {
+                    clearInterval(sosInterval);
+                    timerEl.innerText = "SENT";
+                    timerEl.classList.add("text-brand-orange");
+                    if (navigator.vibrate) navigator.vibrate(1000); 
+                    
+                    // Activate SOS on Network
+                    myData.status = 'SOS';
+                    pushStatusToFirestore();
+                }
+            }, 1000);
+        };
+
+        window.cancelSOS = () => {
+            const overlay = document.getElementById('sos-overlay');
+            const timerEl = document.getElementById('sos-timer');
+            clearInterval(sosInterval);
+            overlay.classList.remove('active');
+            timerEl.classList.remove("text-brand-orange");
+            if (navigator.vibrate) navigator.vibrate([40, 40]);
+            
+            // Deactivate SOS
+            if(myData.status === 'SOS') {
+                myData.status = 'NOMINAL';
+                pushStatusToFirestore();
+            }
+        };
+
+        // Cleanup on exit to prevent ghost markers
+        window.addEventListener("beforeunload", (ev) => {
+            if (userId) {
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'riders', userId);
+                deleteDoc(docRef);
+            }
+        });
+
+        // Bootstrap App
+        window.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>
