@@ -85,7 +85,7 @@
             }
         }
 
-        /* --- STREAMING_CHUNK:Garage Shutter & Physics --- */
+        /* Garage Shutter & Physics */
         .shutter-image-container {
             position: absolute;
             inset: 0;
@@ -135,7 +135,7 @@
             transform: translateY(-105%);
         }
 
-        /* --- STREAMING_CHUNK:App Interior --- */
+        /* App Interior */
         .dashboard-bg {
             background-color: #050505;
             position: relative;
@@ -175,15 +175,13 @@
             transform: translateY(0) scale(1);
         }
 
-        /* --- STREAMING_CHUNK: New UI Elements (Motives & Key) --- */
-        
         /* Dynamic Slider Items - NOW SCROLLING RIGHT TO LEFT */
         .slide-item {
             position: absolute;
             inset: 0;
             opacity: 0;
-            transform: translateX(100%) scale(0.95); /* Start off-screen right */
-            transition: all 0.7s cubic-bezier(0.7, 0, 0.2, 1); /* Snappy mechanical easing */
+            transform: translateX(100%) scale(0.95);
+            transition: all 0.7s cubic-bezier(0.7, 0, 0.2, 1);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -194,12 +192,12 @@
         }
         .slide-item.active {
             opacity: 1;
-            transform: translateX(0) scale(1); /* Lock into center */
+            transform: translateX(0) scale(1);
             z-index: 10;
         }
         .slide-item.exit {
             opacity: 0;
-            transform: translateX(-100%) scale(0.95); /* Exit off-screen left */
+            transform: translateX(-100%) scale(0.95);
             z-index: 1;
         }
 
@@ -347,6 +345,26 @@
             opacity: 0; pointer-events: none; backdrop-filter: blur(15px);
         }
         #toast.show { transform: translateY(0) scale(1); opacity: 1; }
+
+        /* HIGH-END PAGE TRANSITION EFFECTS */
+        .content-fade-out {
+            transform: scale(0.92) translateY(30px) !important;
+            filter: blur(18px) brightness(0.3) !important;
+            opacity: 0 !important;
+            transition: all 1.2s cubic-bezier(0.7, 0, 0.3, 1) !important;
+            pointer-events: none;
+        }
+        
+        #page-transition-overlay {
+            backdrop-filter: blur(0px);
+            -webkit-backdrop-filter: blur(0px);
+        }
+        #page-transition-overlay.engaging {
+            background-color: rgba(0, 0, 0, 1) !important;
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            pointer-events: all;
+        }
     </style>
 </head>
 <body>
@@ -355,29 +373,20 @@
     <main class="device-frame dashboard-bg">
         
         <!-- Background Textures -->
-        <div class="tread-pattern"></div>
-        <div class="hud-corner hud-tl"></div>
-        <div class="hud-corner hud-tr"></div>
-        <div class="hud-corner hud-bl"></div>
-        <div class="hud-corner hud-br"></div>
+        <div class="tread-pattern transition-all duration-1000" id="tread-bg"></div>
+        <div class="hud-corner hud-tl transition-opacity duration-500" id="corner-1"></div>
+        <div class="hud-corner hud-tr transition-opacity duration-500" id="corner-2"></div>
+        <div class="hud-corner hud-bl transition-opacity duration-500" id="corner-3"></div>
+        <div class="hud-corner hud-br transition-opacity duration-500" id="corner-4"></div>
 
-        <!-- Fake Native Status Bar -->
-        <div class="absolute top-0 w-full h-12 z-50 flex justify-between items-center px-6 text-[10px] font-display tracking-widest text-brand-light opacity-60">
-            <span id="clock">00:00</span>
-            <div class="flex gap-2">
-                <i class="ph-fill ph-cell-signal-full"></i>
-                <i class="ph-fill ph-battery-full"></i>
-            </div>
-        </div>
-
-        <!-- --- STREAMING_CHUNK: Garage Shutter Overlay --- -->
+        <!-- Garage Shutter Overlay -->
         <div id="garage-shutter" class="shutter-image-container">
             <div class="vignette-overlay"></div>
             <div id="floor-glow" class="floor-glow"></div>
         </div>
 
-        <!-- --- STREAMING_CHUNK: Dashboard Layout (Top/Middle/Bottom) --- -->
-        <div id="app-content" class="flex flex-col h-full w-full relative z-10 p-6 pt-16 pb-8">
+        <!-- Dashboard Layout -->
+        <div id="app-content" class="flex flex-col h-full w-full relative z-10 p-6 py-8 transform transition-all duration-[1200ms]">
             
             <!-- TOP AREA: Typographic Title -->
             <div class="stagger-item flex-shrink-0 flex flex-col w-full z-20 px-2 text-center" style="transition-delay: 0.1s;">
@@ -386,7 +395,7 @@
                 </h1>
             </div>
 
-            <!-- MIDDLE AREA: Dynamic Slider (Takes up all remaining screen space) -->
+            <!-- MIDDLE AREA: Dynamic Slider -->
             <div class="flex-grow w-full relative z-20 overflow-hidden my-4" id="motive-slider">
                 <!-- Javascript will inject sliding data items here -->
             </div>
@@ -397,7 +406,6 @@
                 <!-- VIEW 1: Main Login Options -->
                 <div id="view-main" class="view-frame absolute w-full bottom-0 transform origin-bottom flex flex-col justify-end gap-4 z-20 opacity-100 h-full">
                     
-                    <!-- Transparent Login Form -->
                     <div class="p-2 flex flex-col gap-5 w-full bg-transparent mt-auto">
                         
                         <!-- Google Capsule -->
@@ -425,7 +433,6 @@
                         <span class="text-[11px] font-bold uppercase tracking-widest font-mono">Abort Protocol</span>
                     </button>
 
-                    <!-- Transparent Phone Form -->
                     <div class="p-2 flex flex-col gap-4 w-full bg-transparent mt-auto">
                         <form onsubmit="handlePhoneSubmit(event)" class="space-y-4">
                             
@@ -444,7 +451,7 @@
                                 </div>
                             </div>
 
-                            <!-- OTP Sequence (Hidden initially) -->
+                            <!-- OTP Sequence -->
                             <div id="otp-section" class="hidden flex-col items-center gap-4 pt-2">
                                 <div class="w-full flex items-center gap-3">
                                     <div class="h-px bg-brand-orange opacity-30 flex-grow"></div>
@@ -491,47 +498,44 @@
             </div>
             <span id="toast-msg" class="text-[11px] font-mono tracking-wide text-white uppercase mt-0.5"></span>
         </div>
+        
+        <!-- HIGH-END REDIRECT OVERLAY -->
+        <div id="page-transition-overlay" class="absolute inset-0 z-[300] bg-black/0 pointer-events-none transition-all duration-[1200ms] ease-in-out flex items-center justify-center">
+            <div id="transition-logo" class="opacity-0 scale-50 transition-all duration-[800ms] transform flex flex-col items-center justify-center mt-8">
+                <i class="ph-fill ph-engine text-6xl text-brand-orange mb-4 drop-shadow-[0_0_20px_rgba(255,61,0,0.8)] animate-pulse"></i>
+                <span class="font-display text-lg font-black tracking-[0.4em] text-white uppercase drop-shadow-md">Syncing</span>
+            </div>
+        </div>
 
     </main>
 
-    <!-- --- STREAMING_CHUNK: Logic & Animations --- -->
     <script>
-        // Set Mock Clock
-        setInterval(() => {
-            const d = new Date();
-            document.getElementById('clock').innerText = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
-        }, 1000);
-
         // --- 1. Cinematic Startup Sequence ---
         document.addEventListener("DOMContentLoaded", () => {
             const shutter = document.getElementById('garage-shutter');
             const floorGlow = document.getElementById('floor-glow');
             const appContent = document.getElementById('app-content');
 
-            initMotiveSlider(); // Initialize the dynamic slider
+            initMotiveSlider();
 
-            // Simulate mechanical engage right before opening
             setTimeout(() => {
                 shutter.style.transform = 'translateY(-2px)';
                 floorGlow.style.opacity = '1'; 
                 if (navigator.vibrate) navigator.vibrate([40, 60, 40]);
             }, 1300);
 
-            // Shutter lifts at exactly 1.5s
             setTimeout(() => {
                 shutter.style.transform = ''; 
                 shutter.classList.add('shutter-open');
                 if (navigator.vibrate) navigator.vibrate(150); 
                 
-                // Reveal dashboard
                 appContent.classList.add('dashboard-revealed');
             }, 1500);
 
-            // Cleanup
             setTimeout(() => { shutter.remove(); }, 3500);
         });
 
-        // --- 2. View Switching Logic (Depth Effect) ---
+        // --- 2. View Switching Logic ---
         function switchView(target) {
             const main = document.getElementById('view-main');
             const phone = document.getElementById('view-phone');
@@ -560,7 +564,39 @@
             if (navigator.vibrate) navigator.vibrate(20); 
         }
 
-        // --- 3. Communication & Ignition Flow ---
+        // --- 3. HIGH END REDIRECT LOGIC ---
+        function triggerSuccessRedirect() {
+            const overlay = document.getElementById('page-transition-overlay');
+            const transitionLogo = document.getElementById('transition-logo');
+            const appContent = document.getElementById('app-content');
+            const treadBg = document.getElementById('tread-bg');
+            
+            // Blur out the main UI components
+            appContent.classList.add('content-fade-out');
+            
+            // Fade out decorative elements
+            treadBg.style.opacity = '0';
+            document.getElementById('corner-1').style.opacity = '0';
+            document.getElementById('corner-2').style.opacity = '0';
+            document.getElementById('corner-3').style.opacity = '0';
+            document.getElementById('corner-4').style.opacity = '0';
+
+            // Engage the heavy blur / black overlay
+            overlay.classList.add('engaging');
+            
+            // Bring in the syncing logo after the background has started blurring
+            setTimeout(() => {
+                transitionLogo.classList.remove('opacity-0', 'scale-50');
+                transitionLogo.classList.add('opacity-100', 'scale-100');
+            }, 300);
+
+            // Redirect smoothly to Home.html
+            setTimeout(() => {
+                window.location.href = 'Home.html';
+            }, 1800); // Wait 1.8 seconds for entire animation sequence to play out
+        }
+
+        // --- 4. Communication & Ignition Flow ---
         let isOtpMode = false;
 
         function handlePhoneSubmit(e) {
@@ -580,7 +616,6 @@
                     return;
                 }
 
-                // Simulate Turning Key
                 btn.classList.add('turning');
                 if (navigator.vibrate) navigator.vibrate([20, 30]);
                 
@@ -607,7 +642,6 @@
                 }, 800);
 
             } else {
-                // Ignition Verification
                 const otpBoxes = document.querySelectorAll('.otp-box');
                 let code = '';
                 otpBoxes.forEach(b => code += b.value);
@@ -624,6 +658,11 @@
                     ignitionIcon.className = "ph-fill ph-check-circle text-3xl text-white z-10 drop-shadow-[0_0_10px_rgba(0,0,0,0.5)]";
                     showToast("Engine Ignited. Welcome Rider.", "ph-engine", "text-green-500");
                     if (navigator.vibrate) navigator.vibrate([100, 50, 200, 50, 300]); 
+                    
+                    // Trigger Custom High-End Redirect Animation
+                    setTimeout(() => {
+                        triggerSuccessRedirect();
+                    }, 800); // 800ms pause to let user see "Success" checkmark
                 }, 1500);
             }
         }
@@ -679,6 +718,11 @@
                 btnElement.innerHTML = originalContent;
                 showToast(`Protocol ${name} Verified.`, "ph-check-circle", "text-green-500");
                 if (navigator.vibrate) navigator.vibrate([50, 100]); 
+                
+                // Trigger Custom High-End Redirect Animation
+                setTimeout(() => {
+                    triggerSuccessRedirect();
+                }, 600);
             }, 1500);
         }
 
@@ -698,7 +742,7 @@
             }, 3500);
         }
 
-        // --- 4. NEW: Large Right-to-Left Center Slider ---
+        // --- 5. Background Slider ---
         function initMotiveSlider() {
             const sliderContainer = document.getElementById('motive-slider');
             if (!sliderContainer) return;
@@ -717,7 +761,6 @@
                 const el = document.createElement('div');
                 el.className = `slide-item w-full h-full ${index === 0 ? 'active' : ''}`;
                 
-                // Scaled up visuals to occupy the center space effectively
                 el.innerHTML = `
                     <div class="w-32 h-32 rounded-3xl border border-brand-metal bg-black/60 flex items-center justify-center shrink-0 shadow-neon-intense mb-4">
                         <i class="ph-duotone ${motive.icon} text-6xl text-brand-orange"></i>
@@ -735,23 +778,15 @@
             
             let currentIndex = 0;
 
-            // Trigger every 3 seconds
             setInterval(() => {
                 const prevIndex = currentIndex;
                 currentIndex = (currentIndex + 1) % slides.length;
                 
-                // Exit current slide to the left
                 slides[prevIndex].classList.remove('active');
                 slides[prevIndex].classList.add('exit');
                 
-                // Prepare the next slide to enter from the right
-                // Remove the 'exit' class from the next slide (if it had it) so it snaps back to the right immediately
                 slides[currentIndex].classList.remove('exit');
-                
-                // Force a browser reflow so the removal of .exit takes effect instantly without animation
                 void slides[currentIndex].offsetWidth; 
-                
-                // Animate next slide to the center
                 slides[currentIndex].classList.add('active');
             }, 3000);
         }
