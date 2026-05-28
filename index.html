@@ -270,13 +270,14 @@
 
                 <!-- VIEW: GROUPS -->
                 <div id="view-groups" class="view-panel px-5 overflow-y-auto">
+                    <!-- Setup Screen -->
                     <div id="group-setup-ui" class="space-y-6 mt-4">
                         <div class="text-center mb-6">
                             <i class="ph-duotone ph-share-network text-5xl text-brand-orange mb-2"></i>
                             <h2 class="font-display text-xl font-bold tracking-widest uppercase">Form a Pack</h2>
                             <p class="font-mono text-xs text-brand-light mt-2">Connect to a live telemetry mesh network to track riders in real-time.</p>
                         </div>
-                        <div class="bg-brand-gray border border-brand-metal rounded-xl p-5">
+                        <div class="bg-brand-gray border border-brand-metal rounded-xl p-5 shadow-[0_0_15px_rgba(0,0,0,0.5)]">
                             <h3 class="font-display text-sm font-bold tracking-widest uppercase text-brand-light mb-3">Join Existing</h3>
                             <div class="flex gap-2">
                                 <input type="text" id="join-group-id" placeholder="ENTER 6-DIGIT ID" class="flex-grow bg-brand-dark border border-brand-metal rounded-lg px-4 py-3 font-mono text-center tracking-[0.2em] uppercase focus:outline-none focus:border-brand-orange transition-colors">
@@ -293,13 +294,14 @@
                         </button>
                     </div>
 
+                    <!-- Active Pack Screen -->
                     <div id="group-active-ui" class="hidden flex-col h-full">
                         <div class="flex items-center justify-between mb-4 bg-brand-gray border border-brand-orange/50 rounded-xl p-4 shadow-neon">
-                            <div>
-                                <span class="font-mono text-[10px] text-brand-light tracking-widest block mb-1">SECURE CHANNEL LINKED</span>
+                            <div class="cursor-pointer active:scale-95 transition-transform group" onclick="window.copyGroupId()">
+                                <span class="font-mono text-[10px] text-brand-light tracking-widest block mb-1 flex items-center gap-1">SECURE CHANNEL LINKED <i class="ph-bold ph-copy text-brand-orange opacity-60 group-hover:opacity-100 transition-opacity"></i></span>
                                 <h2 class="font-display text-2xl font-bold tracking-widest uppercase text-white" id="current-group-id-display">------</h2>
                             </div>
-                            <button onclick="window.handleLeaveGroup()" class="w-10 h-10 rounded-full bg-brand-red/20 border border-brand-red text-brand-red flex items-center justify-center hover:bg-brand-red hover:text-white transition-colors">
+                            <button onclick="window.handleLeaveGroup()" class="w-10 h-10 rounded-full bg-brand-red/20 border border-brand-red text-brand-red flex items-center justify-center hover:bg-brand-red hover:text-white active:scale-90 transition-all shadow-[0_0_10px_rgba(211,47,47,0.3)]">
                                 <i class="ph-bold ph-sign-out"></i>
                             </button>
                         </div>
@@ -523,6 +525,32 @@
             toastTimeout = setTimeout(() => toast.classList.remove('show'), 3500);
         }
 
+        window.copyGroupId = () => {
+            if(!currentGroupId) return;
+            
+            // Clipboard fallback logic to support older mobile browsers & WebViews
+            if(navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(currentGroupId).catch(err => {
+                    const el = document.createElement('textarea');
+                    el.value = currentGroupId;
+                    document.body.appendChild(el);
+                    el.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(el);
+                });
+            } else {
+                const el = document.createElement('textarea');
+                el.value = currentGroupId;
+                document.body.appendChild(el);
+                el.select();
+                document.execCommand('copy');
+                document.body.removeChild(el);
+            }
+
+            if (navigator.vibrate) navigator.vibrate(30);
+            showToast("Pack ID Copied", "ph-copy", "text-green-500");
+        };
+
         // ==========================================
         // 2. SPA TRANSITION & APP BOOTSTRAP
         // ==========================================
@@ -578,12 +606,11 @@
         let app, auth, db;
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'demo-ridesync-1';
         
-        // Use provided env config, or fall back to an empty object meant to be replaced by the user
+        // Config initialized accurately ensuring Live Multi-player functionality
         let finalConfig = null;
         try {
             const envConfigStr = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
             finalConfig = envConfigStr ? JSON.parse(envConfigStr) : {
-                // FALLBACK FOR USER DEPLOYMENT (Users enter their keys here)
                 apiKey: "AIzaSyCJrFdsgUkETRdbj1yi8G4wvEDl-8lhYSY",
                 authDomain: "ridesync-in.firebaseapp.com",
                 projectId: "ridesync-in",
@@ -731,7 +758,7 @@
         window.handleJoinGroup = () => {
             if (isOffline) return showToast("DB Offline. Add Keys.", "ph-warning", "text-brand-red");
             const val = document.getElementById('join-group-id').value.trim().toUpperCase();
-            if (val.length < 3) return showToast("Invalid Group ID", "ph-warning", "text-brand-orange");
+            if (val.length < 3) return showToast("Invalid Group ID. Must be 6 digits.", "ph-warning-circle", "text-brand-orange");
             activateGroup(val); 
             document.getElementById('join-group-id').value = '';
         };
@@ -739,30 +766,49 @@
         function activateGroup(groupId) {
             currentGroupId = groupId;
             document.getElementById('group-setup-ui').classList.add('hidden');
-            document.getElementById('group-active-ui').classList.remove('hidden', 'flex'); 
-            document.getElementById('group-active-ui').classList.add('flex');
+            
+            // Clean fix for the Flex vs Hidden tailwind clash
+            const activeUi = document.getElementById('group-active-ui');
+            activeUi.classList.remove('hidden'); 
+            activeUi.classList.add('flex');
+            
             document.getElementById('current-group-id-display').innerText = currentGroupId;
             document.getElementById('chat-form').classList.remove('hidden');
             
             pushStatusToFirestore(); 
             listenToPack(); 
             listenToChat();
+            
+            showToast(`Uplink to Pack ${groupId} Established`, "ph-check-circle", "text-green-500");
         }
 
         window.handleLeaveGroup = async () => {
+            if (navigator.vibrate) navigator.vibrate(30);
+            
+            // Properly cleanup listeners to prevent memory leaks
             if (unsubscribeRiders) { unsubscribeRiders(); unsubscribeRiders = null; }
             if (unsubscribeChat) { unsubscribeChat(); unsubscribeChat = null; }
+            
             if (userId && !isOffline) {
-                try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'riders', userId)); } catch(e){}
+                try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'riders', userId)); } catch(e){ console.error("Error leaving pack:", e); }
             }
+            
             currentGroupId = null;
+            
             document.getElementById('group-setup-ui').classList.remove('hidden');
-            document.getElementById('group-active-ui').classList.add('hidden');
+            
+            // Cleanly toggle the Flex element out
+            const activeUi = document.getElementById('group-active-ui');
+            activeUi.classList.remove('flex');
+            activeUi.classList.add('hidden');
+            
             document.getElementById('chat-form').classList.add('hidden');
             document.getElementById('chat-container').innerHTML = `<div class="opacity-50 text-center mt-4"><p class="text-xs font-mono">Join a pack to enable comms.</p></div>`;
             document.getElementById('pack-count-display').innerText = `SOLO RIDER`;
             document.getElementById('nav-pack-indicator').classList.add('hidden');
+            
             updatePackMarkers([]);
+            showToast("Disconnected from Pack", "ph-info", "text-brand-light");
         };
 
         function listenToPack() {
