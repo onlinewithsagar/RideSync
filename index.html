@@ -590,6 +590,7 @@
         // ==========================================
 
         let userId = null;
+        let sessionId = "session_" + Math.random().toString(36).substr(2, 9);
         let displayName = "Rider_" + Math.floor(Math.random() * 1000);
         let currentGroupId = null;
         let unsubscribeRiders = null, unsubscribeChat = null;
@@ -731,9 +732,10 @@
         async function pushStatusToFirestore() {
             if (isOffline || !userId || !currentGroupId) return;
             try {
-                // Rule 1: Strict Paths
-                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'riders', userId), {
+                // Rule 1: Strict Paths - Global collection decoupled from environment variables
+                await setDoc(doc(db, 'riders', sessionId), {
                     groupId: currentGroupId, 
+                    userId: userId,
                     displayName: displayName, 
                     avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${userId}&backgroundColor=2A2B2E`,
                     lat: myData.lat, 
@@ -790,7 +792,7 @@
             if (unsubscribeChat) { unsubscribeChat(); unsubscribeChat = null; }
             
             if (userId && !isOffline) {
-                try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'riders', userId)); } catch(e){ console.error("Error leaving pack:", e); }
+                try { await deleteDoc(doc(db, 'riders', sessionId)); } catch(e){ console.error("Error leaving pack:", e); }
             }
             
             currentGroupId = null;
@@ -815,14 +817,14 @@
             if (isOffline || !userId || !currentGroupId) return;
             
             // Rule 2: No Complex Queries. Fetch all riders, filter in memory.
-            const queryRef = collection(db, 'artifacts', appId, 'public', 'data', 'riders');
+            const queryRef = collection(db, 'riders');
             
             unsubscribeRiders = onSnapshot(queryRef, (snapshot) => {
                 const now = Date.now(), packMembers = [];
                 snapshot.forEach(docSnap => {
                     const data = docSnap.data();
-                    // In-memory filter for current group, exclude self, ignore stale data (> 3 mins)
-                    if (data.groupId === currentGroupId && docSnap.id !== userId && (now - data.updatedAt < 3*60*1000)) {
+                    // In-memory filter for current group, exclude self, ignore stale data (> 10 mins to prevent clock skew drops)
+                    if (data.groupId === currentGroupId && docSnap.id !== sessionId && (now - data.updatedAt < 10*60*1000)) {
                         packMembers.push({ id: docSnap.id, ...data });
                     }
                 });
@@ -893,9 +895,9 @@
             
             document.getElementById('chat-input').value = '';
             try { 
-                await setDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'messages')), { 
+                await setDoc(doc(collection(db, 'messages')), { 
                     groupId: currentGroupId, 
-                    senderId: userId, 
+                    senderId: sessionId, 
                     senderName: displayName, 
                     avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${userId}&backgroundColor=2A2B2E`, 
                     text: t, 
@@ -907,7 +909,7 @@
         function listenToChat() {
             if (isOffline || !currentGroupId) return;
             
-            const queryRef = collection(db, 'artifacts', appId, 'public', 'data', 'messages');
+            const queryRef = collection(db, 'messages');
             
             unsubscribeChat = onSnapshot(queryRef, (snapshot) => {
                 let msgs = []; 
@@ -926,7 +928,7 @@
                 }
 
                 msgs.forEach(msg => {
-                    const isMe = msg.senderId === userId; 
+                    const isMe = msg.senderId === sessionId; 
                     const time = new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                     container.insertAdjacentHTML('beforeend', isMe  
                         ? `<div class="flex justify-end pl-8"><div class="bg-brand-orange/20 border border-brand-orange text-white rounded-t-xl rounded-l-xl p-3 text-sm font-mono shadow-sm">${msg.text}</div></div>`
@@ -975,7 +977,7 @@
         window.addEventListener("beforeunload", () => { 
             if (userId && !isOffline) {
                 // Try to remove self from active riders to keep the map clean for others
-                navigator.sendBeacon(`https://firestore.googleapis.com/v1/projects/${finalConfig.projectId}/databases/(default)/documents/artifacts/${appId}/public/data/riders/${userId}?currentDocument.exists=true`);
+                navigator.sendBeacon(`https://firestore.googleapis.com/v1/projects/${finalConfig.projectId}/databases/(default)/documents/riders/${sessionId}?currentDocument.exists=true`);
             }
         });
     </script>
