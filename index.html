@@ -732,8 +732,8 @@
         async function pushStatusToFirestore() {
             if (isOffline || !userId || !currentGroupId) return;
             try {
-                // Rule 1: Strict Paths - Global collection decoupled from environment variables
-                await setDoc(doc(db, 'riders', sessionId), {
+                // Rule 1: Strict Paths - Global collection restored to authorized path
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'riders', sessionId), {
                     groupId: currentGroupId, 
                     userId: userId,
                     displayName: displayName, 
@@ -792,7 +792,7 @@
             if (unsubscribeChat) { unsubscribeChat(); unsubscribeChat = null; }
             
             if (userId && !isOffline) {
-                try { await deleteDoc(doc(db, 'riders', sessionId)); } catch(e){ console.error("Error leaving pack:", e); }
+                try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'riders', sessionId)); } catch(e){ console.error("Error leaving pack:", e); }
             }
             
             currentGroupId = null;
@@ -817,7 +817,7 @@
             if (isOffline || !userId || !currentGroupId) return;
             
             // Rule 2: No Complex Queries. Fetch all riders, filter in memory.
-            const queryRef = collection(db, 'riders');
+            const queryRef = collection(db, 'artifacts', appId, 'public', 'data', 'riders');
             
             unsubscribeRiders = onSnapshot(queryRef, (snapshot) => {
                 const now = Date.now(), packMembers = [];
@@ -895,7 +895,7 @@
             
             document.getElementById('chat-input').value = '';
             try { 
-                await setDoc(doc(collection(db, 'messages')), { 
+                await setDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'messages')), { 
                     groupId: currentGroupId, 
                     senderId: sessionId, 
                     senderName: displayName, 
@@ -909,7 +909,7 @@
         function listenToChat() {
             if (isOffline || !currentGroupId) return;
             
-            const queryRef = collection(db, 'messages');
+            const queryRef = collection(db, 'artifacts', appId, 'public', 'data', 'messages');
             
             unsubscribeChat = onSnapshot(queryRef, (snapshot) => {
                 let msgs = []; 
@@ -977,7 +977,7 @@
         window.addEventListener("beforeunload", () => { 
             if (userId && !isOffline) {
                 // Try to remove self from active riders to keep the map clean for others
-                navigator.sendBeacon(`https://firestore.googleapis.com/v1/projects/${finalConfig.projectId}/databases/(default)/documents/riders/${sessionId}?currentDocument.exists=true`);
+                navigator.sendBeacon(`https://firestore.googleapis.com/v1/projects/${finalConfig.projectId}/databases/(default)/documents/artifacts/${appId}/public/data/riders/${sessionId}?currentDocument.exists=true`);
             }
         });
     </script>
